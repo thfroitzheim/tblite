@@ -20,6 +20,7 @@ srcs += files(
   'charge.f90',
   'dispersion.f90',
   'element.f90',
+  'exchange.f90',
   'halogen.f90',
   'hamiltonian.f90',
   'mask.f90',
