@@ -101,7 +101,7 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    type(integral_type) :: ints
    real(wp), allocatable :: tmp(:)
    type(potential_type) :: pot
-   type(container_cache), allocatable :: ccache, dcache, icache, hcache, rcache
+   type(container_cache) :: ccache, dcache, icache, hcache, rcache, ecache
    class(mixer_type), allocatable :: mixer
    type(timer_type) :: timer
    type(error_type), allocatable :: error
@@ -196,6 +196,12 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
       call timer%pop
    end if
 
+   if (allocated(calc%exchange)) then
+      call timer%push("exchange")
+      call calc%exchange%update(mol, ecache)
+      call timer%pop
+   end if 
+
    call new_potential(pot, mol, calc%bas, wfn%nspin)
    if (allocated(calc%coulomb)) then
       allocate(ccache)
@@ -249,8 +255,8 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    do while(.not.converged .and. iscf < calc%max_iter)
       elast = sum(eelec)
       call next_scf(iscf, mol, calc%bas, wfn, solver, mixer, info, &
-         & calc%coulomb, calc%dispersion, calc%interactions, ints, pot, &
-         & ccache, dcache, icache, eelec, error)
+         & calc%coulomb, calc%dispersion, calc%interactions, calc%exchange, ints, pot, &
+         & ccache, dcache, icache, ecache, eelec, error)
       econverged = abs(sum(eelec) - elast) < econv
       pconverged = mixer%get_error() < pconv
       converged = econverged .and. pconverged
@@ -304,6 +310,12 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
       if (allocated(calc%interactions)) then
          call timer%push("interactions")
          call calc%interactions%get_gradient(mol, icache, wfn, gradient, sigma)
+         call timer%pop
+      end if
+
+      if (allocated(calc%exchange)) then
+         call timer%push("exchange")
+         call calc%exchange%get_gradient_w_overlap(mol, ecache, wfn, gradient, sigma, ints%overlap)
          call timer%pop
       end if
 
@@ -369,6 +381,16 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
             call ctx%message(" - "//label(it)//format_time(stime) &
                & //" ("//format_string(int(stime/ttime*100), '(i3)')//"%)")
          end do
+         if (calc%xtbml /= 0) then
+            stime = timer%get("xtb-ml features")
+            call ctx%message(" - "//"xtb-ml features     "//format_time(stime) &
+               & //" ("//format_string(int(stime/ttime*100), '(i3)')//"%)")  
+         end if    
+         if (allocated(calc%exchange)) then
+            stime = timer%get("exchange")
+            call ctx%message(" - "//"exchange     "//format_time(stime) &
+               & //" ("//format_string(int(stime/ttime*100), '(i3)')//"%)")  
+         end if  
          call ctx%message("")
       end if
    end block

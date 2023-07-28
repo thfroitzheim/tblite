@@ -46,6 +46,8 @@ module tblite_scf_potential
       real(wp), allocatable :: vdp(:, :, :)
       !> Atom-resolved quadrupolar potential
       real(wp), allocatable :: vqp(:, :, :)
+      !> Orbital resolved exchange contribution to the Fock matrix
+      real(wp), allocatable :: kao(:, :, :)
 
       !> Position derivative of atom-resolved charge-dependent potential shift
       real(wp), allocatable :: dvatdr(:, :, :, :)
@@ -137,7 +139,10 @@ subroutine add_pot_to_h1(bas, ints, pot, h1)
    call add_vao_to_h1(bas, ints%overlap, pot%vao, h1)
    call add_vmp_to_h1(bas, ints%dipole, pot%vdp, h1)
    call add_vmp_to_h1(bas, ints%quadrupole, pot%vqp, h1)
-
+   ! add kao to h1
+   if (allocated(pot%kao)) then 
+      call add_kao_to_h1(bas, pot%kao, h1)
+   end if
    call magnet_to_updown(h1)
 end subroutine add_pot_to_h1
 
@@ -187,6 +192,27 @@ subroutine add_vsh_to_vao(bas, vsh, vao)
    end do
 end subroutine add_vsh_to_vao
 
+!> Add K to the potential 
+subroutine add_kao_to_h1(bas, kao, h1)
+   !> Basis set information
+   type(basis_type), intent(in) :: bas
+   !> K terms, orbital resolved
+   real(wp), intent(in) :: kao(:, :, :)
+   !> Effective Hamiltonian
+   real(wp), intent(inout) :: h1(:, :, :)
+   integer :: iao, jao, spin
+
+   !$omp parallel do collapse(3) schedule(runtime) default(none) &
+   !$omp shared(h1, bas, kao) private(spin, iao, jao)
+   do spin = 1, size(h1, 3)
+      do iao = 1, bas%nao
+         do jao = 1, bas%nao
+            h1(jao, iao, spin) = h1(jao, iao, spin) &
+               & - kao(jao, iao, spin)
+         end do
+      end do
+   end do
+end subroutine
 
 !> Add a charge-dependent potential to the Hamiltonian
 subroutine add_vao_to_h1(bas, sint, vao, h1)

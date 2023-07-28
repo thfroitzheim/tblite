@@ -14,24 +14,8 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with tblite.  If not, see <https://www.gnu.org/licenses/>.
 
-add_subdirectory("post_processing")
-
-set(dir "${CMAKE_CURRENT_SOURCE_DIR}")
-
-list(
-  APPEND srcs
-  "${dir}/charge.f90"
-  "${dir}/dispersion.f90"
-  "${dir}/element.f90"
-  "${dir}/exchange.f90"
-  "${dir}/halogen.f90"
-  "${dir}/hamiltonian.f90"
-  "${dir}/mask.f90"
-  "${dir}/multipole.f90"
-  "${dir}/post_processing.f90"
-  "${dir}/repulsion.f90"
-  "${dir}/serde.f90"
-  "${dir}/thirdorder.f90"
+srcs += files(
+  'cache.f90',
+  'mulliken_kfock.f90',
+  'type.f90'
 )
-
-set(srcs "${srcs}" PARENT_SCOPE)
