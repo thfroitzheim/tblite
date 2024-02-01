@@ -64,6 +64,12 @@ module tblite_wavefunction_type
       real(wp), allocatable :: dpat(:, :, :)
       !> Atomic quadrupole moments for each atom, shape: [5, nat, spin]
       real(wp), allocatable :: qpat(:, :, :)
+
+      !> Derivative of CEH chargs w.r.t. the positions: [3, nat, nsh]
+      real(wp), allocatable :: dqdr(:, :, :)
+      !> Derivative of CEH chargs w.r.t. the lattice vectors: [3, 3, nsh]
+      real(wp), allocatable :: dqdL(:, :, :)
+
    end type wavefunction_type
 
 contains
@@ -96,7 +102,12 @@ subroutine new_wavefunction(self, nat, nsh, nao, nspin, kt)
 
    allocate(self%dpat(3, nat, nspin))
    allocate(self%qpat(6, nat, nspin))
-
+   
+   allocate(self%dqdr(3, nat, nat))
+   allocate(self%dqdL(3, 3, nat))
+    
+   self%dqdr(:, :, :) = 0.0_wp
+   self%dqdL(:, :, :) = 0.0_wp
    self%qat(:, :) = 0.0_wp
    self%qsh(:, :) = 0.0_wp
    self%dpat(:, :, :) = 0.0_wp

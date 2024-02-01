@@ -60,7 +60,7 @@ contains
 
 
    !> Run the CEH calculation (equivalent to xtb_singlepoint)
-   subroutine ceh_guess(ctx, calc, mol, error, wfn, accuracy, verbosity)
+   subroutine ceh_guess(ctx, calc, mol, error, wfn, accuracy, grad, verbosity)
       !> Calculation context
       type(context_type), intent(inout) :: ctx
       !> CEH calculator
@@ -73,6 +73,8 @@ contains
       type(wavefunction_type), intent(inout) :: wfn
       !> Accuracy for computation
       real(wp), intent(in) :: accuracy
+      !> Accuracy for computation
+      logical, intent(in) :: grad
       !> Verbosity level of output
       integer, intent(in), optional :: verbosity
 
@@ -95,15 +97,22 @@ contains
       logical :: grad
 
       real(wp) :: elec_entropy
-      real(wp) :: nel, cutoff
+      real(wp) :: nel = 0.0_wp, cutoff
       real(wp), allocatable :: tmp(:)
 
       integer :: i, prlevel
 
-      ! coordination number related arrays
+      
+      !> coordination number related arrays
       real(wp), allocatable :: cn(:), dcndr(:, :, :), dcndL(:, :, :), cn_en(:), dcn_endr(:, :, :), dcn_endL(:, :, :)
-      ! self energy related arrays
-      real(wp), allocatable :: selfenergy(:), dsedcn(:), dsedcn_en(:), lattr(:, :)
+    !   !> self energy related arrays
+    !   real(wp), allocatable :: selfenergy(:), dsedcn(:), dsedcn_en(:), lattr(:, :)
+      !> self energy related arrays
+      real(wp), allocatable :: selfenergy(:), dsedr(:,:,:), dsedL(:,:,:) 
+      !> periodicity
+      real(wp), allocatable :: lattr(:, :)
+      !> CEH matrix element derivative arrays: 
+      real(wp), allocatable :: dh0dr(:,:,:), dh0dL(:,:,:), doverlap(:,:,:)
 
       call timer%push("wall time CEH")
 
@@ -116,13 +125,8 @@ contains
       if (prlevel > 1) then
          call ctx%message("CEH guess")
       endif
-      ! Gradient logical as future starting point (not implemented yet)
-      ! Entry point could either be (i) modified wavefunction type (including derivatives),
-      ! (iii) additional wavefunction derivative type (see old commits) or (ii) optional
-      ! dqdR variable in this routine
-      grad = .false.
 
-      ! Define occupation
+      !> Define occupation
       call get_occupation(mol, calc%bas, calc%h0, wfn%nocc, wfn%n0at, wfn%n0sh)
       nel = sum(wfn%n0at) - mol%charge
       if (mod(mol%uhf, 2) == mod(nint(nel), 2)) then
@@ -149,9 +153,16 @@ contains
       end if
 
       ! calculate the scaled self energies
-      allocate(selfenergy(calc%bas%nsh), dsedcn(calc%bas%nsh), dsedcn_en(calc%bas%nsh))
-      call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, cn=cn, cn_en=cn_en, &
-      & selfenergy=selfenergy, dsedcn=dsedcn, dsedcn_en=dsedcn_en)
+    !   allocate(selfenergy(calc%bas%nsh), dsedcn(calc%bas%nsh), dsedcn_en(calc%bas%nsh))
+    !   call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, cn=cn, cn_en=cn_en, &
+    !   & selfenergy=selfenergy, dsedcn=dsedcn, dsedcn_en=dsedcn_en)
+      allocate(selfenergy(calc%bas%nsh)) 
+      if (grad) then
+         allocate(dsedr(3, mol%nat,calc%bas%nsh), dsedL(3, 3, calc%bas%nsh))
+      end if 
+      call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, &
+      & cn=cn, cn_en=cn_en, dcndr=dcndr, dcndL=dcndL, dcn_endr=dcn_endr, dcn_endL=dcn_endL, &
+      & selfenergy=selfenergy, dsedr=dsedr, dsedL=dsedL)
 
       cutoff = get_cutoff(calc%bas, accuracy)
       call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
@@ -201,7 +212,20 @@ contains
 
       call timer%pop
       ttime = timer%get("wall time CEH")
+      
+      call timer%push("wall time CEH gradient")
+      if (grad) then
+         allocate(dh0dr(3,calc%bas%nao,calc%bas%nao),&
+         & dh0dL(3,calc%bas%nao,calc%bas%nao),doverlap(3,calc%bas%nao,calc%bas%nao))
+         dh0dr(:, :, :) = 0.0_wp
+         dh0dL(:, :, :) = 0.0_wp
+         doverlap(:, :, :) = 0.0_wp
+         call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+            & dsedr, dsedL, pot, wfn%density, dh0dr, dh0dL, doverlap)
 
-   end subroutine ceh_guess
+      end if 
+      call timer%pop()
+
+    end subroutine ceh_guess
 
 end module tblite_ceh_singlepoint
