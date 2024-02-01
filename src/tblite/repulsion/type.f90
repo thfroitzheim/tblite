@@ -30,6 +30,8 @@ module tblite_repulsion_type
    !> This class provides a method to retrieve the contributions to the energy,
    !> gradient and virial within a given cutoff.
    type, public, extends(container_type), abstract :: repulsion_type
+   !contains 
+   !   procedure :: get_engrad
    end type repulsion_type
 
 end module tblite_repulsion_type

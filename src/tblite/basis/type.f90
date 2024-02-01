@@ -24,7 +24,7 @@ module tblite_basis_type
    implicit none
    private
 
-   public :: new_basis, get_cutoff
+   public :: new_basis, get_cutoff, integral_cutoff
 
    !> Maximum contraction length of basis functions.
    !> The limit is chosen as twice the maximum size returned by the STO-NG expansion
@@ -41,6 +41,9 @@ module tblite_basis_type
       !> Contraction coefficients of the primitive Gaussian functions,
       !> might contain normalization
       real(wp) :: coeff(maxg) = 0.0_wp
+   contains
+      !> Scales the coefficient of the cgto 
+      procedure :: scale_cgto
    end type cgto_type
 
    !> Collection of information regarding the basis set of a system
@@ -73,7 +76,10 @@ module tblite_basis_type
       !> Mapping from shells to the respective atom
       integer, allocatable :: sh2at(:)
       !> Contracted Gaussian basis functions forming the basis set
-      type(cgto_type), allocatable :: cgto(:, :)
+      class(cgto_type), allocatable :: cgto(:, :)
+   contains
+      !> Scales the coefficient of the basis
+      procedure :: scale_basis
    end type basis_type
 
    !> Get optimal real space cutoff for integral evaluation
@@ -161,6 +167,40 @@ subroutine new_basis(self, mol, nshell, cgto, acc)
    self%min_alpha = min_alpha
 
 end subroutine new_basis
+
+subroutine scale_basis(self, mol, qat, cn)
+   !> Instance of the basis set data
+   class(basis_type), intent(inout) :: self
+   !> Molecular structure data
+   type(structure_type), intent(in) :: mol
+   !> Atomic charges for the charge scaling of the basis set 
+   real(wp), intent(in) :: qat(:)
+   !> Coordination number
+   real(wp), intent(in) :: cn(:)
+   
+   integer :: iat, isp, ish
+
+   do iat = 1, mol%nat
+      isp = mol%id(iat)
+      do ish = 1, self%nsh_at(iat)
+         call self%cgto(ish, isp)%scale_cgto(qat(iat), cn(iat))
+      end do
+   end do
+
+end subroutine scale_basis
+
+!> Dummy procedure to scale the contraction coefficients of the CGTOs
+subroutine scale_cgto(self, qat, cn, expscal)
+   !> Instance of the basis set data
+   class(cgto_type), intent(inout) :: self
+   !> Atomic charges for the charge scaling of the basis set 
+   real(wp), intent(in) :: qat
+   !> Coordination number
+   real(wp), intent(in) :: cn
+   !> Exponent scaling factor
+   real(wp), intent(in), optional :: expscal
+
+end subroutine scale_cgto
 
 !> Determine required real space cutoff for the basis set
 pure function get_cutoff(self, acc) result(cutoff)

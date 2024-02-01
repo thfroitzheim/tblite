@@ -58,6 +58,8 @@ module tblite_xtb_calculator
    type, public :: xtb_calculator
       !> Basis set definition
       type(basis_type) :: bas
+      !> Scaled basis set definition
+      type(basis_type) :: bas_scaled
       !> Core Hamiltonian
       type(tb_hamiltonian) :: h0
       !> Coordination number for modifying the self-energies

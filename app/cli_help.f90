@@ -89,7 +89,7 @@ module tblite_cli_help
       "Options"//nl//&
       ""//nl//&
       "      --method <name>     Base parametrization of the xTB Hamiltonian to use"//nl//&
-      "                          Available methods: gfn1, gfn2, ipea1"//nl//&
+      "                          Available methods: gfn1, gfn2, gp3, ipea1"//nl//&
       "      --output <file>     Output file for writing parametrization"//nl//&
       help_text_general//nl//&
       ""//nl//&

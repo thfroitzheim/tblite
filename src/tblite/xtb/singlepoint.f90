@@ -25,6 +25,7 @@ module tblite_xtb_singlepoint
    use mctc_io, only : structure_type
    use tblite_adjlist, only : adjacency_list, new_adjacency_list
    use tblite_basis_type, only : get_cutoff, basis_type
+   use tblite_basis_qvszp, only : qvszp_basis_type
    use tblite_blas, only : gemv
    use tblite_container, only : container_cache
    use tblite_context, only : context_type, escape
@@ -70,6 +71,7 @@ contains
 !> Entry point for performing single point calculation using the xTB calculator
 subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigma, &
       & verbosity, results, post_process)
+    !   & verbosity, results, wfn_ceh)
    !> Calculation context
    type(context_type), intent(inout) :: ctx
    !> Molecular structure data
@@ -92,6 +94,9 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    type(results_type), intent(out), optional :: results
    type(post_processing_list), intent(inout), optional :: post_process
    
+   !> CEH charge-guess wavefunction 
+   type(wavefunction_type), intent(in), allocatable, optional :: wfn_ceh
+
    logical :: grad, converged, econverged, pconverged
    integer :: prlevel
    real(wp) :: econv, pconv, cutoff, elast, nel
@@ -151,6 +156,21 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
       wfn%nuhf = mod(nint(nel), 2)
    end if
    call get_alpha_beta_occupation(wfn%nocc, wfn%nuhf, wfn%nel(1), wfn%nel(2))
+   
+   ! Calculate the coordination number required for basis set scaling, repulsion, ...
+   if (allocated(calc%ncoord)) then
+      allocate(cn(mol%nat))
+      if (grad) then
+         allocate(dcndr(3, mol%nat, mol%nat), dcndL(3, 3, mol%nat))
+      end if
+      call calc%ncoord%get_cn(mol, cn, dcndr, dcndL)
+   end if
+
+   ! scale the basis set (only for q-vSZP) with its charge and CN dependence
+   !if(present(wfn_ceh)) then
+   !   call calc%bas%scale_basis(wfn_ceh%qat, cn)
+   !   call calc%bas_scaled%scale_basis(wfn_ceh%qat, cn)
+   !end if
 
    if (allocated(calc%halogen)) then
       call timer%push("halogen")
@@ -208,13 +228,6 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
       call ctx%message(label_electrons // format_string(wfn%nocc, real_format) // " e")
 
    call timer%push("hamiltonian")
-   if (allocated(calc%ncoord)) then
-      allocate(cn(mol%nat))
-      if (grad) then
-         allocate(dcndr(3, mol%nat, mol%nat), dcndL(3, 3, mol%nat))
-      end if
-      call calc%ncoord%get_cn(mol, cn, dcndr, dcndL)
-   end if
 
    allocate(selfenergy(calc%bas%nsh), dsedcn(calc%bas%nsh))
    call get_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, cn=cn, &

@@ -36,6 +36,7 @@ module tblite_driver_run
    use tblite_wavefunction, only : wavefunction_type, new_wavefunction, &
       & sad_guess, eeq_guess, shell_partition
    use tblite_xtb_calculator, only : xtb_calculator, new_xtb_calculator
+   use tblite_xtb_gp3, only : new_gp3_calculator, export_gp3_param
    use tblite_xtb_gfn2, only : new_gfn2_calculator, export_gfn2_param
    use tblite_xtb_gfn1, only : new_gfn1_calculator, export_gfn1_param
    use tblite_xtb_ipea1, only : new_ipea1_calculator, export_ipea1_param
@@ -141,6 +142,8 @@ subroutine run_main(config, error)
       select case(method)
       case default
          call fatal_error(error, "Unknown method '"//method//"' requested")
+      case("gp3")
+         call new_gp3_calculator(calc, mol)
       case("gfn2")
          call new_gfn2_calculator(calc, mol)
       case("gfn1")
@@ -155,14 +158,14 @@ subroutine run_main(config, error)
 
    call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, nspin, config%etemp * kt)
 
-   if (config%guess == "ceh") then
-      call new_ceh_calculator(calc_ceh, mol)
-      call new_wavefunction(wfn_ceh, mol%nat, calc_ceh%bas%nsh, calc_ceh%bas%nao, 1, config%etemp_guess * kt)
-      if (config%grad) then
-         call ctx%message("WARNING: CEH gradient not yet implemented. Stopping.")
-         return
-      end if
-   end if
+!    if (config%guess == "ceh") then
+!       call new_ceh_calculator(calc_ceh, mol)
+!       call new_wavefunction(wfn_ceh, mol%nat, calc_ceh%bas%nsh, calc_ceh%bas%nao, 1, config%etemp_guess * kt)
+!       if (config%grad) then
+!          call ctx%message("WARNING: CEH gradient not yet implemented. Stopping.")
+!          return
+!       end if
+!    end if
 
    if (allocated(config%efield)) then
       block
@@ -170,13 +173,6 @@ subroutine run_main(config, error)
          cont = electric_field(config%efield*vatoau)
          call calc%push_back(cont)
       end block
-         if (config%guess == "ceh") then
-            block
-            class(container_type), allocatable :: cont
-            cont = electric_field(config%efield*vatoau)
-            call calc_ceh%push_back(cont)
-            end block
-         end if
    end if
 
    select case(config%guess)
@@ -187,6 +183,21 @@ subroutine run_main(config, error)
    case("eeq")
       call eeq_guess(mol, calc, wfn)
    case("ceh")
+
+      call new_ceh_calculator(calc_ceh, mol)
+      call new_wavefunction(wfn_ceh, mol%nat, calc_ceh%bas%nsh, calc_ceh%bas%nao, 1, config%etemp * kt)
+      if (config%grad) then
+         call ctx%message("WARNING: CEH gradient not yet implemented. Stopping.")
+         return
+      end if
+      if (allocated(config%efield)) then
+         block
+            class(container_type), allocatable :: cont
+            cont = electric_field(config%efield*vatoau)
+            call calc_ceh%push_back(cont)
+         end block
+      end if
+
       call ceh_guess(ctx, calc_ceh, mol, error, wfn_ceh, config%accuracy, config%verbosity)
       if (ctx%failed()) then
          call fatal(ctx, "CEH singlepoint calculation failed")
@@ -196,6 +207,7 @@ subroutine run_main(config, error)
          end do
          error stop
       end if
+
       wfn%qat(:, 1) = wfn_ceh%qat(:, 1)
       call shell_partition(mol, calc, wfn)
    end select
@@ -257,6 +269,7 @@ subroutine run_main(config, error)
 
    call xtb_singlepoint(ctx, mol, calc, wfn, config%accuracy, energy, gradient, sigma, &
       & config%verbosity, results, post_proc)
+    !   & config%verbosity, results, wfn_ceh)
    if (ctx%failed()) then
       call fatal(ctx, "Singlepoint calculation failed")
       do while(ctx%failed())

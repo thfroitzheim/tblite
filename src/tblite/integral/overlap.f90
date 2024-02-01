@@ -291,9 +291,9 @@ end subroutine overlap_grad_3d
 
 pure subroutine overlap_cgto(cgtoj, cgtoi, r2, vec, intcut, overlap)
    !> Description of contracted Gaussian function on center i
-   type(cgto_type), intent(in) :: cgtoi
+   class(cgto_type), intent(in) :: cgtoi
    !> Description of contracted Gaussian function on center j
-   type(cgto_type), intent(in) :: cgtoj
+   class(cgto_type), intent(in) :: cgtoj
    !> Square distance between center i and j
    real(wp), intent(in) :: r2
    !> Distance vector between center i and j, ri - rj
