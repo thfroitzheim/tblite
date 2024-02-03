@@ -15,11 +15,10 @@
 ! along with tblite.  If not, see <https://www.gnu.org/licenses/>.
 
 !> @file tblite/integral/diat_trafo.f90
-!> Provides help tools for evaluation of the diatomic overlap
+!> Evaluation of the diatomic scaled overlap
 module tblite_integral_diat_trafo
    use mctc_env, only : wp
    use tblite_blas, only: gemm
-use iso_fortran_env, only: output_unit
 
    implicit none
    private
@@ -126,8 +125,6 @@ contains
          block_overlap(1:9,1:9) = eff_block_overlap(1:9,1:9)
       end select
 
-      !call write_2d_matrix(block_overlap, "block_overlap-back") 
-
    end subroutine diat_trafo
 
 
@@ -137,7 +134,7 @@ contains
    !> 3. scale in the diatomic frame (bonding type specific)
    !> 4. transform back 
    !> The transformation can be applied to both the overlap and each dimension of its derivative
-   subroutine diat_trafo_grad(block_overlap, block_doverlap, vec_diat_trafo, ksig, kpi, kdel, maxl)
+   pure subroutine diat_trafo_grad(block_overlap, block_doverlap, vec_diat_trafo, ksig, kpi, kdel, maxl)
       !> Diatomic block of CGTO overlap to be transformed (+ scaled)
       real(wp),intent(inout)    :: block_overlap(9,9)
       !> Derivative of diatomic block of CGTO overlap to be transformed (+ scaled)
@@ -158,12 +155,8 @@ contains
       trafomat = 0.0_wp
       dtrafomat = 0.0_wp
 
-      !call write_2d_matrix(block_overlap, "block_overlap") 
-
       ! 1. Calculate the transformation matrix
-      !write(*,*) "before d_harmtr"
       call d_harmtr(maxl, vec_diat_trafo, trafomat, dtrafomat)
-      !write(*,*) "after d_harmtr"
 
       select case (maxl)
       case (0)
@@ -195,16 +188,6 @@ contains
          eff_block_doverlap(:,1:9,1:9) = block_doverlap(:,1:9,1:9)
       end select
 
-      !call write_2d_matrix(eff_block_overlap, "eff_tra_mat") 
-      !call write_2d_matrix(eff_block_doverlap(1,:,:), "x-eff_dtra_mat") 
-      !call write_2d_matrix(eff_block_doverlap(2,:,:), "y-eff_dtra_mat") 
-      !call write_2d_matrix(eff_block_doverlap(3,:,:), "z-eff_dtra_mat") 
-
-      !call write_2d_matrix(eff_block_overlap, "eff_block_overlap") 
-      !call write_2d_matrix(eff_block_doverlap(1,:,:), "x-eff_block_doverlap") 
-      !call write_2d_matrix(eff_block_doverlap(2,:,:), "y-eff_block_doverlap") 
-      !call write_2d_matrix(eff_block_doverlap(3,:,:), "z-eff_block_doverlap") 
-      
       ! 2. Transform the submatrix
       ! interm_s = matmul(matmul(transpose(trafomat), block_overlap),trafomat)
       if (maxl > 0) then
@@ -229,15 +212,6 @@ contains
          interm_osdo(:,1,1) = 0.0_wp
       endif
 
-      call write_2d_matrix(interm_oso, "interm_oso") 
-      !call write_2d_matrix(interm_doso(1,:,:), "x-interm_doso") 
-      !call write_2d_matrix(interm_doso(2,:,:), "y-interm_doso") 
-      !call write_2d_matrix(interm_doso(3,:,:), "z-interm_doso") 
-
-      !call write_2d_matrix(interm_odso(1,:,:), "x-interm_odso") 
-      !call write_2d_matrix(interm_odso(2,:,:), "y-interm_odso") 
-      !call write_2d_matrix(interm_odso(3,:,:), "z-interm_odso")       
-
       ! 3.1. Scale elements in diatomic frame
       ! 3.2. Scale elements with equivalent bonding situation in the
       !      diatomic frame.
@@ -247,15 +221,6 @@ contains
          call scale_diatomic_frame(interm_osdo(ic,:,:), ksig, kpi, kdel, maxl) 
          call scale_diatomic_frame(interm_odso(ic,:,:), ksig, kpi, kdel, maxl) 
       end do
-
-      call write_2d_matrix(interm_oso, "interm_oso-scaled") 
-      !call write_2d_matrix(interm_doso(1,:,:), "x-interm_doso-scaled") 
-      !call write_2d_matrix(interm_doso(2,:,:), "y-interm_doso-scaled") 
-      !call write_2d_matrix(interm_doso(3,:,:), "z-interm_doso-scaled") 
-
-      !call write_2d_matrix(interm_odso(1,:,:), "x-interm_odso-scaled") 
-      !call write_2d_matrix(interm_odso(2,:,:), "y-interm_odso-scaled") 
-      !call write_2d_matrix(interm_odso(3,:,:), "z-interm_odso-scaled")
 
       ! 4. Transform diatomic frame quantities (S', (dOSO)', and (OdSO)') back to original frame
       ! block_overlap = matmul(matmul(trafomat, trans_block_s),transpose(trafomat))
@@ -267,7 +232,6 @@ contains
          call gemm(amat=tmp,bmat=eff_tra_mat,cmat=eff_block_overlap,transa='N',transb='T')
 
          do ic = 1, 3
-            write(*,*) "DIRECTION", ic
             ! block_doverlap = dO * S' * O^T + O * S' * dO^T
             call gemm(amat=eff_dtra_mat(ic,:,:),bmat=interm_oso,cmat=tmp,transa='N',transb='N')
             call gemm(alpha=1.0_wp,amat=tmp,bmat=eff_tra_mat,cmat=eff_block_doverlap(ic,:,:),transa='N',transb='T')
@@ -279,9 +243,6 @@ contains
             !eff_block_doverlap(ic,:,:) = tmp2 !+ transpose(tmp2)
 
             ! block_doverlap += O * ((dOSO)' + (OdSO)' + (OSdO)') * O^T 
-            call write_2d_matrix(interm_doso(ic,:,:), "interm_doso") 
-            call write_2d_matrix(interm_odso(ic,:,:), "interm_odso") 
-            call write_2d_matrix(interm_osdo(ic,:,:), "interm_osdo") 
 
             !tmp2 = interm_doso(ic,:,:) + interm_odso(ic,:,:) + interm_osdo(ic,:,:)
             call gemm(amat=eff_tra_mat,bmat=interm_doso(ic,:,:),cmat=tmp,transa='N',transb='N')
@@ -298,11 +259,6 @@ contains
          eff_block_doverlap(:,1,1) = interm_odso(:,1,1)
       endif
 
-      !call write_2d_matrix(eff_block_overlap, "eff_block_overlap-back") 
-      call write_2d_matrix(eff_block_doverlap(1,:,:), "x-eff_block_doverlap-back") 
-      call write_2d_matrix(eff_block_doverlap(2,:,:), "y-eff_block_doverlap-back") 
-      call write_2d_matrix(eff_block_doverlap(3,:,:), "z-eff_block_doverlap-back") 
-
       ! Write it back to the original matrix
       block_overlap = 0.0_wp
       block_doverlap = 0.0_wp
@@ -317,11 +273,6 @@ contains
          block_overlap(1:9,1:9) = eff_block_overlap(1:9,1:9)
          block_doverlap(:,1:9,1:9) = eff_block_doverlap(:,1:9,1:9)
       end select
-
-      !call write_2d_matrix(block_overlap, "block_overlap-back") 
-      call write_2d_matrix(block_doverlap(1,:,:), "x-block_doverlap-back") 
-      call write_2d_matrix(block_doverlap(2,:,:), "y-block_doverlap-back") 
-      call write_2d_matrix(block_doverlap(3,:,:), "z-block_doverlap-back") 
 
    end subroutine diat_trafo_grad
 
@@ -420,7 +371,7 @@ contains
       ! *** p functions (trafomat(4x4)) ***
       ! -----------------------------
 
-      !> tblite ordering with adapted column ordering
+      ! tblite ordering with adapted column ordering
       ! 1st index:
       ! MSINDO defintion of p function ordering is converted to
       ! tblite definition of p function ordering. E.g. for first entry:
@@ -453,9 +404,9 @@ contains
       SIN2P = 2.0_wp * SINP*COSP
       SQRT3 = SQRT(3.0_wp)
 
-      !> Original MSINDO ordering
-      !> The MSINDO d SAO ordering corresponds to the
-      !> tblite ordering of d SAOs
+      ! Original MSINDO ordering
+      ! The MSINDO d SAO ordering corresponds to the
+      ! tblite ordering of d SAOs
       trafomat(5,5) = (3.0_wp * COST**2 - 1.0_wp) * 0.5_wp
       trafomat(6,5) = SQRT3*SIN2T*COSP*0.5_wp
       trafomat(7,5) = SQRT3*SIN2T*SINP*0.5_wp
@@ -484,7 +435,7 @@ contains
 
    end subroutine harmtr
 
-   subroutine d_harmtr(maxl,veckl,trafomat, dtrafomat)
+   pure subroutine d_harmtr(maxl,veckl,trafomat, dtrafomat)
       !> Maximum angular momentum
       integer, intent(in)  :: maxl
       !> Normalized vector from atom k to atom l
@@ -506,14 +457,10 @@ contains
       real(wp) :: cos2p, cos2t, cosp, cost, sin2p, sin2t, sinp, sint, sqrt3
       real(wp) :: dcos2t, dsin2t, dcos2p, dsin2p, dpdx, dpdy, dtdz
 
-      
-      write(*,*) "We are doing a pair with up to ", maxl
-
-
       !     ------------------------------------------------------------------
-      if (maxl > 2) then
-         error stop "ERROR: f function or higher ang. mom. not implemented in harmtr"
-      endif
+      !if (maxl > 2) then
+      !   error stop "ERROR: f function or higher ang. mom. not implemented in harmtr"
+      !endif
 
       trafomat = 0.0_wp
       trafomat_dt = 0.0_wp
@@ -545,17 +492,9 @@ contains
       endif
 
       ! Prepare sperical coordinate derivative
-      !write(*,*) "veckl(1)", veckl(1)
-      !write(*,*) "veckl(2)", veckl(2)
-      !write(*,*) "veckl(3)", veckl(3)
-      !write(*,*) "denom1:", veckl(1)**2 + veckl(2)**2
-      !write(*,*) "denom2:", SQRT(1.0_wp - veckl(3))
       dpdx = veckl(2) / (veckl(1)**2 + veckl(2)**2)
       dpdy = veckl(1) / (veckl(1)**2 + veckl(2)**2)
       dtdz = -1.0_wp / SQRT(1.0_wp - veckl(3)**2)
-      !write(*,*) "dpdx", dpdx
-      !write(*,*) "dpdy", dpdy
-      !write(*,*) "dtdz", dtdz
       
       ! -----------------------------
       ! *** p functions (trafomat(4x4)) ***
@@ -581,7 +520,7 @@ contains
       trafomat(4,2) = -SINP
       trafomat(2,2) = COSP
       trafomat(3,2) = 0.0_wp
-!
+
       trafomat_dt(4,3) = COST*COSP
       trafomat_dt(2,3) = COST*SINP
       trafomat_dt(3,3) = -SINT
@@ -591,7 +530,7 @@ contains
       trafomat_dt(4,2) = 0.0_wp
       trafomat_dt(2,2) = 0.0_wp
       trafomat_dt(3,2) = 0.0_wp
-!
+
       trafomat_dp(4,3) = -SINT*SINP
       trafomat_dp(2,3) = SINT*COSP
       trafomat_dp(3,3) = 0.0_wp
@@ -601,7 +540,7 @@ contains
       trafomat_dp(4,2) = -COSP
       trafomat_dp(2,2) = -SINP
       trafomat_dp(3,2) = 0.0_wp
-!
+
       trafomat_dpy(4,3) = -SINT*SINP
       trafomat_dpy(2,3) = SINT*COSP
       trafomat_dpy(3,3) = 0.0_wp
@@ -616,10 +555,6 @@ contains
          dtrafomat(1, 1:4, 1:4) = dpdx * trafomat_dp(1:4, 1:4)  
          dtrafomat(2, 1:4, 1:4) = dpdy * trafomat_dpy(1:4, 1:4)  
          dtrafomat(3, 1:4, 1:4) = dtdz * trafomat_dt(1:4, 1:4) 
-         !call write_2d_matrix(trafomat, "p-trafomat")
-         !call write_2d_matrix(dtrafomat(1,:,:), "px-dtrafomat")
-         !call write_2d_matrix(dtrafomat(2,:,:), "py-dtrafomat")
-         !call write_2d_matrix(dtrafomat(3,:,:), "pz-dtrafomat")
          return
       end if
 
@@ -750,25 +685,15 @@ contains
       dtrafomat(2, :, :) = dpdy * trafomat_dpy(:, :)
       dtrafomat(3, :, :) = dtdz * trafomat_dt(:, :)
 
-      !call write_2d_matrix(trafomat, "d-trafomat")
-      !call write_2d_matrix(dtrafomat(1,:,:), "dx-dtrafomat")
-      !call write_2d_matrix(dtrafomat(2,:,:), "dy-dtrafomat")
-      !call write_2d_matrix(dtrafomat(3,:,:), "dz-dtrafomat")
-
-
    end subroutine d_harmtr
 
-   !pure
-   subroutine scale_diatomic_frame(diat_mat, ksig, kpi, kdel, maxl)
+   pure subroutine scale_diatomic_frame(diat_mat, ksig, kpi, kdel, maxl)
       !> Block matrix in the diatomic frame to be scaled
       real(wp),intent(inout)    :: diat_mat(:,:)
       !> Scaling parameters for different bonding contributions
       real(wp),intent(in)       :: ksig, kpi, kdel
       !> Highest angular momentum between the two shells
       integer,intent(in)        :: maxl
-      !write(*,*) "ksig", ksig
-      !write(*,*) "kpi", kpi
-      !write(*,*) "kdel", kdel
 
       !call write_2d_matrix(diat_mat, "diat_mat in scaling before")
       diat_mat(1,1) = diat_mat(1,1)*ksig ! Sigma bond s   <-> s
@@ -794,51 +719,7 @@ contains
             diat_mat(9,9) = diat_mat(9,9)*kdel ! Delta bond dxy <-> dxy
          endif
       endif
-      !call write_2d_matrix(diat_mat, "diat_mat in scaling after")
-   end subroutine scale_diatomic_frame
 
-   subroutine write_2d_matrix(matrix, name, unit, step)
-     implicit none
-     real(wp), intent(in) :: matrix(:, :)
-     character(len=*), intent(in), optional :: name
-     integer, intent(in), optional :: unit
-     integer, intent(in), optional :: step
-     integer :: d1, d2
-     integer :: i, j, k, l, istep, iunit
- 
-     d1 = size(matrix, dim=1)
-     d2 = size(matrix, dim=2)
- 
-     if (present(unit)) then
-       iunit = unit
-     else
-       iunit = output_unit
-     end if
- 
-     if (present(step)) then
-       istep = step
-     else
-       istep = 6
-     end if
- 
-     if (present(name)) write (iunit, '(/,"matrix printed:",1x,a)') name
- 
-     do i = 1, d2, istep
-       l = min(i + istep - 1, d2)
-       write (iunit, '(/,6x)', advance='no')
-       do k = i, l
-         write (iunit, '(6x,i7,3x)', advance='no') k
-       end do
-       write (iunit, '(a)')
-       do j = 1, d1
-         write (iunit, '(i6)', advance='no') j
-         do k = i, l
-           write (iunit, '(1x,f15.8)', advance='no') matrix(j, k)
-         end do
-         write (iunit, '(a)')
-       end do
-     end do
- 
-   end subroutine write_2d_matrix
+   end subroutine scale_diatomic_frame
 
 end module tblite_integral_diat_trafo

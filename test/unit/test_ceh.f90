@@ -67,10 +67,10 @@ contains
          new_unittest("scaled-selfenergy-LiH", test_scaled_selfenergy_lih), &
          new_unittest("scaled-selfenergy-S2", test_scaled_selfenergy_s2), &
          new_unittest("scaled-selfenergy-SiH4", test_scaled_selfenergy_sih4), &
-         !new_unittest("scaled-selfenergy_grad-H2", test_scaled_selfenergy_numgrad_h2), &
-         !new_unittest("scaled-selfenergy_grad-LiH", test_scaled_selfenergy_numgrad_lih), &
-         !new_unittest("scaled-selfenergy_grad-S2", test_scaled_selfenergy_numgrad_s2), &
-         !new_unittest("scaled-selfenergy_grad-SiH4", test_scaled_selfenergy_numgrad_sih4), &
+         new_unittest("scaled-selfenergy_grad-H2", test_scaled_selfenergy_numgrad_h2), &
+         new_unittest("scaled-selfenergy_grad-LiH", test_scaled_selfenergy_numgrad_lih), &
+         new_unittest("scaled-selfenergy_grad-S2", test_scaled_selfenergy_numgrad_s2), &
+         new_unittest("scaled-selfenergy_grad-SiH4", test_scaled_selfenergy_numgrad_sih4), &
          new_unittest("hamiltonian-H2", test_hamiltonian_h2), &
          new_unittest("hamiltonian-LiH", test_hamiltonian_lih), &
          new_unittest("hamiltonian-S2", test_hamiltonian_s2), &
@@ -93,7 +93,7 @@ contains
          new_unittest("q-mol-4", test_q_mb04), &
          new_unittest("q-chrgd-efield-mol", test_q_ef_chrg_mb01), &
          new_unittest("d-mol", test_d_mb01), &
-         new_unittest("d-field-mol", test_d_field_mb04), &
+         new_unittest("d-field-mol", test_d_field_mb04) &
          ]
 
    end subroutine collect_ceh
@@ -447,7 +447,7 @@ contains
            
             call get_hamiltonian(mol, lattr, list, bas, h0, selfenergy, &
                & overlapl, overlap_diatl, dpint, hamiltonianl)
-            write(*,*) "BEGINNING NEW ATOM", iat, ic
+            !write(*,*) "BEGINNING NEW ATOM", iat, ic
             mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
             !numdr(ic, iat, :, :) = 0.5_wp*(hamiltonianr - hamiltonianl)/step
             !numdr(ic, iat, :, :) = 0.5_wp*(overlapr - overlapl)/step
@@ -455,15 +455,15 @@ contains
             do ish = 1, bas%nsh_id(izp)
                ii = bas%iao_sh(is+ish)
                do iao = 1, bas%nao_sh(is+ish)
-                  write(*,*) "ii", ii, izp, ish, iao, ii+iao
+                  !write(*,*) "ii", ii, izp, ish, iao, ii+iao
                   do jat = 1, mol%nat
                      jzp = mol%id(jat)
                      js = bas%ish_at(jat)
                      do jsh = 1, bas%nsh_id(jzp) 
                         jj = bas%iao_sh(js+jsh)
                         do jao = 1, bas%nao_sh(js+jsh)
-                           write(*,*) "jj", jj, jzp, jsh, jao, jj+jao
-                           write(*,*) 0.5_wp*(overlap_diatr(jj+jao,ii+iao) - overlap_diatl(jj+jao,ii+iao))/step
+                           !write(*,*) "jj", jj, jzp, jsh, jao, jj+jao
+                           !write(*,*) 0.5_wp*(overlap_diatr(jj+jao,ii+iao) - overlap_diatl(jj+jao,ii+iao))/step
                            !red_numdr(ic, jj+jao, ii+iao) = red_numdr(ic, jj+jao, ii+iao) & 
                            !  & + 0.5_wp*(overlapr(jj+jao,ii+iao) - overlapl(jj+jao,ii+iao))/step
                            red_numdr(ic, jj+jao, ii+iao) = red_numdr(ic, jj+jao, ii+iao) & 
@@ -491,9 +491,9 @@ contains
             !call write_2d_matrix(overlapl(:, :), "sl")
             !call write_2d_matrix(numdr(ic, iat, :, :), "ds")
             
-            call write_2d_matrix(overlap_diatr(:, :), "s_diatr")
-            call write_2d_matrix(overlap_diatl(:, :), "s_diatl")
-            call write_2d_matrix(numdr(ic, iat, :, :), "ds_diat")
+            !call write_2d_matrix(overlap_diatr(:, :), "s_diatr")
+            !call write_2d_matrix(overlap_diatl(:, :), "s_diatl")
+            !call write_2d_matrix(numdr(ic, iat, :, :), "ds_diat")
             
          end do
       end do
@@ -525,9 +525,9 @@ contains
          !call write_2d_matrix(red_numdr(ic, :, :), "numgrad-s")
          !call write_2d_matrix(doverlap(ic, :, :)-red_numdr(ic, :, :), "diff grad-s")
 
-         call write_2d_matrix(doverlap(ic, :, :), "grad-s_diat")
-         call write_2d_matrix(red_numdr(ic, :, :), "numgrad-s_diat")
-         call write_2d_matrix(doverlap(ic, :, :)-red_numdr(ic, :, :), "diff grad-s_diat")
+         !call write_2d_matrix(doverlap(ic, :, :), "grad-s_diat")
+         !call write_2d_matrix(red_numdr(ic, :, :), "numgrad-s_diat")
+         !call write_2d_matrix(doverlap(ic, :, :)-red_numdr(ic, :, :), "diff grad-s_diat")
          
          !do iat = 1, mol%nat
          !   izp = mol%id(iat)
@@ -556,9 +556,9 @@ contains
          !   end do
          !end do
       end do
-      !if (any(abs(dh0dr - numdr) > thr2)) then
-      !   call test_failed(error, "Derivative of coordination number does not match")
-      !end if
+    !   if (any(abs(dh0dr - numdr) > thr2)) then
+    !      call test_failed(error, "Derivative of coordination number does not match")
+    !   end if
    
    end subroutine test_hamiltonian_numgrad
 
