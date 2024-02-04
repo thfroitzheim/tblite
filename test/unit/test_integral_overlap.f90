@@ -1830,13 +1830,13 @@ subroutine write_2d_matrix(matrix, name, unit, step)
      l = min(i + istep - 1, d2)
      write (iunit, '(/,6x)', advance='no')
      do k = i, l
-       write (iunit, '(6x,i7,3x)', advance='no') k
+       write (iunit, '(6x,i7,1x)', advance='no') k
      end do
      write (iunit, '(a)')
      do j = 1, d1
        write (iunit, '(i6)', advance='no') j
        do k = i, l
-         write (iunit, '(1x,f15.8)', advance='no') matrix(j, k)
+         write (iunit, '(1x,f13.8)', advance='no') matrix(j, k)
        end do
        write (iunit, '(a)')
      end do

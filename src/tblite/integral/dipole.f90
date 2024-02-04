@@ -390,7 +390,7 @@ subroutine dipole_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
    !> Dipole moment integrals for the given pair i  and j
    real(wp), intent(out) :: dpint(3, msao(cgtoj%ang), msao(cgtoi%ang))
    !> Block overlap matrix as a technical intermediate for the diatomic frame
-   real(wp) :: block_overlap(9,9)
+   real(wp) :: block_overlap(16,16)
    !> Offset array for the block overlap matrix 
    !> (number of AOs that appear before the current angular momentum)
    integer, parameter :: offset_nao(8) = [0, 1, 4, 9, 16, 25, 36, 49]

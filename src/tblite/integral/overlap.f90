@@ -19,6 +19,10 @@
 
 !> Implementation of overlap integrals
 module tblite_integral_overlap
+   use iso_fortran_env, only: output_unit
+
+
+
    use mctc_env, only : wp
    use mctc_io, only : structure_type
    use mctc_io_constants, only : pi
@@ -358,8 +362,6 @@ subroutine overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
    real(wp), intent(out) :: overlap(msao(cgtoj%ang), msao(cgtoi%ang)), &
      & overlap_scaled(msao(cgtoj%ang), msao(cgtoi%ang))
 
-   !> Block overlap matrix as a technical intermediate for the diatomic frame
-   real(wp) :: block_overlap(9,9)
    !> Offset array for the block overlap matrix 
    !> (number of AOs that appear before the current angular momentum)
    integer, parameter :: offset_nao(8) = [0, 1, 4, 9, 16, 25, 36, 49]
@@ -367,6 +369,9 @@ subroutine overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
    integer :: ip, jp, mli, mlj, l
    real(wp) :: eab, oab, est, s1d(0:maxl2), rpi(3), rpj(3), cc, val, pre
    real(wp) :: s3d(mlao(cgtoj%ang), mlao(cgtoi%ang))
+   
+   !> Block overlap matrix as a technical intermediate for the diatomic frame
+   real(wp) :: block_overlap(offset_nao(max(cgtoj%ang,cgtoi%ang)+2),offset_nao(max(cgtoj%ang,cgtoi%ang)+2))
 
    s3d(:, :) = 0.0_wp
 
@@ -535,7 +540,8 @@ subroutine overlap_numgrad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
 end subroutine overlap_numgrad_cgto_diat_scal
 
 
-pure subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
+!pure 
+subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
 &  vec_diat_trafo, ksig, kpi, kdel, overlap, doverlap, overlap_scaled, doverlap_scaled)
    !> Description of contracted Gaussian function on center i
    type(cgto_type), intent(in) :: cgtoi
@@ -560,10 +566,6 @@ pure subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
    !> Overlap integral gradient for the given pair i  and j
    real(wp), intent(out) :: doverlap_scaled(3, msao(cgtoj%ang), msao(cgtoi%ang))
 
-   !> Block overlap matrix as a technical intermediate for the diatomic frame
-   !> The derivative is for each dimension (x,y,z) separate
-   real(wp) :: block_overlap(9,9)
-   real(wp) :: block_doverlap(3,9,9) 
    !> Offset array for the block overlap matrix 
    !> (number of AOs that appear before the current angular momentum)
    integer, parameter :: offset_nao(8) = [0, 1, 4, 9, 16, 25, 36, 49]
@@ -572,6 +574,11 @@ pure subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
    real(wp) :: eab, oab, est, s1d(0:maxl2), rpi(3), rpj(3), cc, val, grad(3), pre
    real(wp) :: s3d(mlao(cgtoj%ang), mlao(cgtoi%ang))
    real(wp) :: ds3d(3, mlao(cgtoj%ang), mlao(cgtoi%ang))
+
+   !> Block overlap matrix as a technical intermediate for the diatomic frame
+   !> The derivative is for each dimension (x,y,z) separate
+   real(wp) :: block_overlap(offset_nao(max(cgtoj%ang,cgtoi%ang)+2),offset_nao(max(cgtoj%ang,cgtoi%ang)+2))
+   real(wp) :: block_doverlap(3,offset_nao(max(cgtoj%ang,cgtoi%ang)+2),offset_nao(max(cgtoj%ang,cgtoi%ang)+2))
 
    s3d(:, :) = 0.0_wp
    ds3d(:, :, :) = 0.0_wp
@@ -924,5 +931,60 @@ subroutine get_overlap_diatframe_lat(mol, trans, cutoff, bas, scal_fac, overlap,
    end do
 
 end subroutine get_overlap_diatframe_lat
+
+
+
+
+
+
+
+
+
+
+subroutine write_2d_matrix(matrix, name, unit, step)
+   implicit none
+   real(wp), intent(in) :: matrix(:, :)
+   character(len=*), intent(in), optional :: name
+   integer, intent(in), optional :: unit
+   integer, intent(in), optional :: step
+   integer :: d1, d2
+   integer :: i, j, k, l, istep, iunit
+
+   d1 = size(matrix, dim=1)
+   d2 = size(matrix, dim=2)
+
+   if (present(unit)) then
+     iunit = unit
+   else
+     iunit = output_unit
+   end if
+
+   if (present(step)) then
+     istep = step
+   else
+     istep = 6
+   end if
+
+   if (present(name)) write (iunit, '(/,"matrix printed:",1x,a)') name
+
+   do i = 1, d2, istep
+     l = min(i + istep - 1, d2)
+     write (iunit, '(/,6x)', advance='no')
+     do k = i, l
+       write (iunit, '(6x,i7,1x)', advance='no') k
+     end do
+     write (iunit, '(a)')
+     do j = 1, d1
+       write (iunit, '(i6)', advance='no') j
+       do k = i, l
+         write (iunit, '(1x,f13.8)', advance='no') matrix(j, k)
+       end do
+       write (iunit, '(a)')
+     end do
+   end do
+
+ end subroutine write_2d_matrix
+
+
 
 end module tblite_integral_overlap
