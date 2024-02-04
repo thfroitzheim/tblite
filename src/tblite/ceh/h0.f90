@@ -322,11 +322,11 @@ contains
       type(potential_type), intent(in) :: pot
       !> Density matrix
       real(wp), intent(in) :: pmat(:, :, :)
-      !> Derivative of the electronic energy w.r.t. the coordination number
-      real(wp), intent(inout) :: dh0dr(:, :, :)
       !> Derivative of the electronic energy w.r.t. coordinate displacements
+      real(wp), intent(inout) :: dh0dr(:, :, :)
+      !> Derivative of the electronic energy w.r.t. the lattice vector
       real(wp), intent(inout) :: dh0dL(:, :, :)
-      !> Derivative of the electronic energy w.r.t. the coordination number
+      !> Derivative of the electronic energy w.r.t. coordinate displacements
       real(wp), intent(inout) :: doverlap(:, :, :)
       
    
