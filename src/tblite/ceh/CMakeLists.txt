@@ -21,6 +21,7 @@ list(
   "${dir}/ceh.f90"
   "${dir}/h0.f90"
   "${dir}/singlepoint.f90"
+  "${dir}/coupled_perturbed.f90"
 )
 
 set(srcs "${srcs}" PARENT_SCOPE)

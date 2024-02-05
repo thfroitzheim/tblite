@@ -36,18 +36,15 @@ module tblite_ceh_coupled_perturbed
    implicit none
    private
 
-   public :: c
+   public :: get_density_matrix_gradient
 
    real(wp), parameter :: cn_cutoff = 25.0_wp
 
-
-   character(len=*), parameter :: real_format = "(es20.13)"
-   character(len=25), parameter :: label_cutoff = "integral cutoff"
 contains
 
 
    !> Determine the density matrix gradient based on the coupled-perturbed formalism
-   subroutine get_density_matrix_gradient(mol,bas,wfn,list,dh0dr,dh0dL,doverlap,ddensity)
+   subroutine get_density_matrix_gradient(mol,bas,wfn,list,dh0dr,dh0dL,doverlap,ddensitydr,ddensitydL)
       !> Molecular structure data
       type(structure_type), intent(in) :: mol      
       !> Basis set information
@@ -63,8 +60,9 @@ contains
       !> Derivative of the electronic energy w.r.t. coordinate displacements
       real(wp), intent(in) :: doverlap(:, :, :)
       !> Derivative of the electronic energy w.r.t. coordinate displacements
-      real(wp), intent(in) :: ddensity(:, :, :)
-      
+      real(wp), intent(in) :: ddensitydr(:, :, :)
+      !> Derivative of the electronic energy w.r.t. the lattice vector
+      real(wp), intent(in) :: ddensitydL(:, :, :)
 
       ! Transform the derivatives of Fock and overlap matrix into the MO basis
 
@@ -77,6 +75,6 @@ contains
 
       ! Transform the first derivative of the density matrix back to the AO basis
 
-    end subroutine ceh_guess
+    end subroutine get_density_matrix_gradient
 
 end module tblite_ceh_coupled_perturbed

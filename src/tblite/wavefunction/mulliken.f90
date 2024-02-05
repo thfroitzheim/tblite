@@ -30,6 +30,7 @@ module tblite_wavefunction_mulliken
    public :: get_mulliken_shell_charges, get_mulliken_atomic_multipoles
    public :: get_molecular_dipole_moment, get_molecular_quadrupole_moment
    public :: get_mayer_bond_orders, get_mayer_bond_orders_uhf
+   public :: get_mulliken_shell_charges_gradient
 
 contains
 
@@ -68,29 +69,32 @@ subroutine get_mulliken_shell_charges_gradient(bas, smat, pmat, dsmat, dpmatdr, 
    type(basis_type), intent(in) :: bas
    real(wp), intent(in) :: smat(:, :)
    real(wp), intent(in) :: pmat(:, :, :)
-   real(wp), intent(in) :: n0sh(:)
-   real(wp), intent(out) :: qsh(:, :)
+   real(wp), intent(in) :: dsmat(:, :, :)
+   real(wp), intent(in) :: dpmatdr(:, :, :)
+   real(wp), intent(in) :: dpmatdL(:, :, :)
+   real(wp), intent(out) :: dqshdr(:, :, :)
+   real(wp), intent(out) :: dqshdL(:, :, :)
 
    integer :: iao, jao, spin
    real(wp) :: pao
 
-   qsh(:, :) = 0.0_wp
-   !$omp parallel do default(none) collapse(2) schedule(runtime) reduction(+:qsh) &
-   !$omp shared(bas, pmat, smat) private(spin, iao, jao, pao)
-   do spin = 1, size(pmat, 3)
-      do iao = 1, bas%nao
-         pao = 0.0_wp
-         do jao = 1, bas%nao
-            pao = pao + pmat(jao, iao, spin) * smat(jao, iao)
-         end do
-         qsh(bas%ao2sh(iao), spin) = qsh(bas%ao2sh(iao), spin) - pao
-      end do
-   end do
+   ! qsh(:, :) = 0.0_wp
+   ! !$omp parallel do default(none) collapse(2) schedule(runtime) reduction(+:qsh) &
+   ! !$omp shared(bas, pmat, smat) private(spin, iao, jao, pao)
+   ! do spin = 1, size(pmat, 3)
+   !    do iao = 1, bas%nao
+   !       pao = 0.0_wp
+   !       do jao = 1, bas%nao
+   !          pao = pao + pmat(jao, iao, spin) * smat(jao, iao)
+   !       end do
+   !       qsh(bas%ao2sh(iao), spin) = qsh(bas%ao2sh(iao), spin) - pao
+   !    end do
+   ! end do
 
-   call updown_to_magnet(qsh)
-   qsh(:, 1) = qsh(:, 1) + n0sh
+   ! call updown_to_magnet(qsh)
+   ! qsh(:, 1) = qsh(:, 1) + n0sh
 
-end subroutine get_mulliken_shell_charges
+end subroutine get_mulliken_shell_charges_gradient
 
 subroutine get_mulliken_atomic_multipoles(bas, mpmat, pmat, mpat)
    type(basis_type), intent(in) :: bas

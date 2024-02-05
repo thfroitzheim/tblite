@@ -20,14 +20,12 @@
 !> Implementation of overlap integrals
 module tblite_integral_overlap
    use iso_fortran_env, only: output_unit
-
-
-
+   
    use mctc_env, only : wp
    use mctc_io, only : structure_type
    use mctc_io_constants, only : pi
    use tblite_basis_type, only : basis_type, cgto_type
-   use tblite_integral_diat_trafo, only: relvec, diat_trafo, diat_trafo_grad 
+   use tblite_integral_diat_trafo, only: diat_trafo, diat_trafo_grad 
    use tblite_integral_trafo, only : transform0, transform1, transform2
    implicit none
    private
@@ -343,7 +341,7 @@ end subroutine overlap_cgto
 
 ! pure
 subroutine overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, & 
-& vec_diat_trafo, ksig, kpi, kdel, overlap, overlap_scaled)
+& ksig, kpi, kdel, overlap, overlap_scaled)
    !> Description of contracted Gaussian function on center i
    type(cgto_type), intent(in) :: cgtoi
    !> Description of contracted Gaussian function on center j
@@ -356,8 +354,6 @@ subroutine overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
    real(wp), intent(in) :: ksig, kpi, kdel
    !> Maximum value of integral prefactor to consider
    real(wp), intent(in) :: intcut
-   !> Transformation vector for the diatomic frame
-   real(wp), intent(in) :: vec_diat_trafo(3)
    !> Overlap integrals (scaled and unscaled) for the given pair i  and j
    real(wp), intent(out) :: overlap(msao(cgtoj%ang), msao(cgtoi%ang)), &
      & overlap_scaled(msao(cgtoj%ang), msao(cgtoi%ang))
@@ -414,7 +410,7 @@ subroutine overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
    ! 2. Set up transformation matrix, transform the submatrix,
    ! scale the elements with the corresponding factor, transform back 
    ! according to: trans_block_s = O^T * S * O
-   call diat_trafo(block_overlap, vec_diat_trafo, ksig, kpi, kdel, max(cgtoj%ang,cgtoi%ang))
+   call diat_trafo(block_overlap, vec, ksig, kpi, kdel, max(cgtoj%ang,cgtoi%ang))
    ! 3. Fill the overlap_scaled matrix with the back-transformed submatrix
    overlap_scaled(1:msao(cgtoj%ang), 1:msao(cgtoi%ang)) = &
      & block_overlap(offset_nao(cgtoj%ang+1)+1:offset_nao(cgtoj%ang+1)+msao(cgtoj%ang), &
@@ -479,7 +475,7 @@ pure subroutine overlap_grad_cgto(cgtoj, cgtoi, r2, vec, intcut, overlap, doverl
 end subroutine overlap_grad_cgto
 
 subroutine overlap_numgrad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
-&  vec_diat_trafo, ksig, kpi, kdel, overlap, doverlap, overlap_scaled, doverlap_scaled)
+&  ksig, kpi, kdel, overlap, doverlap, overlap_scaled, doverlap_scaled)
 
    !> Description of contracted Gaussian function on center i
    type(cgto_type), intent(in) :: cgtoi
@@ -489,8 +485,6 @@ subroutine overlap_numgrad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
    real(wp), intent(in) :: r2
    !> Distance vector between center i and j, ri - rj
    real(wp), intent(in) :: vec(3)
-   !> Transformation vector for the diatomic frame
-   real(wp), intent(in) :: vec_diat_trafo(3)
    !> Scaling factors for the diatomic frame for the three differnt bonding motifs
    real(wp), intent(in) :: ksig, kpi, kdel
    !> Maximum value of integral prefactor to consider
@@ -506,31 +500,28 @@ subroutine overlap_numgrad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
 
    real(wp), allocatable :: sr_scaled(:,:), sl_scaled(:,:), sr(:,:), sl(:,:)
    integer :: ic 
-   real(wp) :: tmp_vec(3), tmp_vec_diat_trafo(3), tmp_r2
+   real(wp) :: tmp_vec(3), tmp_r2
    real(wp), parameter :: step = 1.0e-6_wp
 
    tmp_vec = vec
-   tmp_vec_diat_trafo = vec_diat_trafo
    tmp_r2 = r2
 
    allocate(sr_scaled(msao(cgtoj%ang), msao(cgtoi%ang)), sl_scaled(msao(cgtoj%ang), msao(cgtoi%ang)), &
    & sr(msao(cgtoj%ang), msao(cgtoi%ang)), sl(msao(cgtoj%ang), msao(cgtoi%ang)))
 
    call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & intcut, vec_diat_trafo, ksig, kpi, kdel, overlap, overlap_scaled)   
+      & intcut, ksig, kpi, kdel, overlap, overlap_scaled)   
 
    do ic = 1, 3
       tmp_vec(ic) = tmp_vec(ic) + step
       tmp_r2 = sum(tmp_vec**2)
-      call relvec(tmp_vec, sqrt(tmp_r2), tmp_vec_diat_trafo)
       call overlap_cgto_diat_scal(cgtoj, cgtoi, tmp_r2, tmp_vec,&
-      & intcut, tmp_vec_diat_trafo, ksig, kpi, kdel, sr, sr_scaled)
+      & intcut, ksig, kpi, kdel, sr, sr_scaled)
       
       tmp_vec(ic) = tmp_vec(ic) - 2*step
       tmp_r2 = sum(tmp_vec**2)
-      call relvec(tmp_vec, sqrt(tmp_r2), tmp_vec_diat_trafo)
       call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, tmp_vec,&
-      & intcut, tmp_vec_diat_trafo, ksig, kpi, kdel, sl, sl_scaled)
+      & intcut, ksig, kpi, kdel, sl, sl_scaled)
 
       tmp_vec(ic) = tmp_vec(ic) + step
       doverlap(ic, :, :) = 0.5_wp * (sr - sl) / step
@@ -542,7 +533,7 @@ end subroutine overlap_numgrad_cgto_diat_scal
 
 !pure 
 subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
-&  vec_diat_trafo, ksig, kpi, kdel, overlap, doverlap, overlap_scaled, doverlap_scaled)
+&  ksig, kpi, kdel, overlap, doverlap, overlap_scaled, doverlap_scaled)
    !> Description of contracted Gaussian function on center i
    type(cgto_type), intent(in) :: cgtoi
    !> Description of contracted Gaussian function on center j
@@ -551,8 +542,6 @@ subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
    real(wp), intent(in) :: r2
    !> Distance vector between center i and j, ri - rj
    real(wp), intent(in) :: vec(3)
-   !> Transformation vector for the diatomic frame
-   real(wp), intent(in) :: vec_diat_trafo(3)
    !> Scaling factors for the diatomic frame for the three differnt bonding motifs
    real(wp), intent(in) :: ksig, kpi, kdel
    !> Maximum value of integral prefactor to consider
@@ -629,7 +618,7 @@ subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
 
    ! 2. Set up transformation matrix, transform the submatrix,
    ! scale the elements with the corresponding factor, transform back 
-   call diat_trafo_grad(block_overlap, block_doverlap, vec_diat_trafo, ksig, kpi, kdel, max(cgtoj%ang,cgtoi%ang)) 
+   call diat_trafo_grad(block_overlap, block_doverlap, vec, ksig, kpi, kdel, max(cgtoj%ang,cgtoi%ang)) 
 
    ! 3. Fill the (d)overlap_scaled matrix with the back-transformed submatrix
    overlap_scaled(1:msao(cgtoj%ang), 1:msao(cgtoi%ang)) = &
@@ -848,8 +837,6 @@ subroutine get_overlap_diatframe_lat(mol, trans, cutoff, bas, scal_fac, overlap,
    real(wp), intent(out) :: overlap(:, :)
    !> Overlap matrix with scaled elements in the diatomic frame
    real(wp), intent(out) :: overlap_scaled(:, :)
-   !> Transformation vector for the diatomic frame
-   real(wp) :: vec_diat_trafo(3)
    !> Scaling factors for the diatomic frame for the three differnt bonding motifs
    !> (sigma, pi, delta)
    real(wp) :: ksig, kpi, kdel
@@ -874,7 +861,7 @@ subroutine get_overlap_diatframe_lat(mol, trans, cutoff, bas, scal_fac, overlap,
    !$omp shared(mol, bas, trans, cutoff2, overlap, overlap_scaled,scal_fac) &
    !$omp private(r2, vec, stmp, sscaledtmp) &
    !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao) &
-   !$omp private(ksig, kpi, kdel, vec_diat_trafo)
+   !$omp private(ksig, kpi, kdel)
    do iat = 1, mol%nat
       izp = mol%id(iat)
       is = bas%ish_at(iat)
@@ -886,7 +873,6 @@ subroutine get_overlap_diatframe_lat(mol, trans, cutoff, bas, scal_fac, overlap,
             r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
             if (r2 > cutoff2) cycle
             if (iat /= jat) then
-               call relvec(vec, sqrt(r2), vec_diat_trafo)
                !> Determine scaling factors from atom parameters
                ksig = 2.0_wp / (1.0_wp / scal_fac(1,mol%num(mol%id(iat))) &
                & + 1.0_wp / scal_fac(1,mol%num(mol%id(jat))) )
@@ -903,8 +889,7 @@ subroutine get_overlap_diatframe_lat(mol, trans, cutoff, bas, scal_fac, overlap,
                   sscaledtmp = 0.0_wp
                   if (iat /= jat) then
                      call overlap_cgto_diat_scal(bas%cgto(jsh, jzp), bas%cgto(ish, izp), &
-                        & r2, vec, bas%intcut, vec_diat_trafo, & 
-                        & ksig, kpi, kdel, stmp, sscaledtmp)
+                        & r2, vec, bas%intcut, ksig, kpi, kdel, stmp, sscaledtmp)
                   else
                      call overlap_cgto(bas%cgto(jsh, jzp), bas%cgto(ish, izp), &
                         & r2, vec, bas%intcut, stmp)

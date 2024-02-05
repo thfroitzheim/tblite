@@ -26,7 +26,7 @@ module tblite_integral_diat_trafo
    implicit none
    private
 
-   public :: relvec, diat_trafo, diat_trafo_grad
+   public :: diat_trafo, diat_trafo_grad
 
    !> Dimension of trafo matrix for highest angular momentum.
    integer, parameter :: ndim(7) = [1, 4, 9, 16, 25, 36, 49]
@@ -35,11 +35,11 @@ contains
 
    !> Transformation to the diatomic frame and back: 
    !pure 
-   subroutine diat_trafo(block_overlap, vec_diat_trafo, ksig, kpi, kdel, maxl)
+   subroutine diat_trafo(block_overlap, vec, ksig, kpi, kdel, maxl)
       !> Diatomic block of CGTOs to be transformed (+ scaled)
       real(wp),intent(inout)    :: block_overlap(:,:)
-      !> Transformation vector for the diatomic frame
-      real(wp),intent(in)       :: vec_diat_trafo(3)
+      !> Transformation vector for the diatomic frame (i.e. vector between the two centers)
+      real(wp),intent(in)       :: vec(3)
       !> Scaling parameters for different bonding contributions
       real(wp),intent(in)       :: ksig, kpi, kdel
       !> Highest angular momentum between the two shells
@@ -55,7 +55,7 @@ contains
       allocate(transformed_s(trafo_dim,trafo_dim), tmp(trafo_dim,trafo_dim), source=0.0_wp)
 
       ! 1. Setup the transformation matrix
-      call harmtr(maxl, vec_diat_trafo, trafomat)
+      call harmtr(maxl, vec, trafomat)
 
       ! 2. Transform the overlap submatrix to the diatomic frame
       ! trans_block_s = O^T * S * O
@@ -78,19 +78,18 @@ contains
       else
          block_overlap(1,1) = transformed_s(1,1)
       endif
-
    end subroutine diat_trafo
 
 
    !> Gradient of Transformation to the diatomic frame and back: 
    !pure 
-   subroutine diat_trafo_grad(block_overlap, block_doverlap, vec_diat_trafo, ksig, kpi, kdel, maxl)
+   subroutine diat_trafo_grad(block_overlap, block_doverlap, vec, ksig, kpi, kdel, maxl)
       !> Diatomic block of CGTO overlap to be transformed (+ scaled)
       real(wp),intent(inout)    :: block_overlap(:,:)
       !> Derivative of diatomic block of CGTO overlap to be transformed (+ scaled)
       real(wp),intent(inout)    :: block_doverlap(:,:,:)
-      !> Transformation vector for the diatomic frame
-      real(wp),intent(in)       :: vec_diat_trafo(3)
+      !> Transformation vector for the diatomic frame (i.e. vector between the two centers)
+      real(wp),intent(in)       :: vec(3)
       !> Scaling parameters for different bonding contributions
       real(wp),intent(in)       :: ksig, kpi, kdel
       !> Highest angular momentum between the two shells
@@ -114,7 +113,7 @@ contains
       & tmp(trafo_dim,trafo_dim), tmp2(trafo_dim,trafo_dim), source=0.0_wp)
 
       ! 1. Setup the transformation matrix and its derivative
-      call d_harmtr(maxl, vec_diat_trafo, trafomat, dtrafomat)
+      call d_harmtr(maxl, vec, trafomat, dtrafomat)
 
       ! 2. Transform the overlap submatrix to the diatomic frame
       ! interm_s = matmul(matmul(transpose(trafomat), block_overlap),trafomat)
@@ -185,49 +184,6 @@ contains
    end subroutine diat_trafo_grad
 
 
-   subroutine relvec(vec, rkl, veckl)
-      !> Original vector between atoms A and B
-      real(wp), intent(in)             :: vec(3)
-      !> Distance between the two atoms
-      real(wp), intent(in)             :: rkl
-      !> Normalized vector from atom k to atom l
-      real(wp), intent(out)            :: veckl(3)
-
-      real(wp), parameter              :: eps = 4.0e-08_wp
-      real(wp)                         :: sq
-
-      veckl(1:3) = vec(1:3) !/ rkl
-      !if ( abs(1.0_wp-abs(veckl(1))) .lt. eps ) then
-      !   veckl(1) = sign(1.0_wp,veckl(1))
-      !   veckl(2) = 0.0_wp
-      !   veckl(3) = 0.0_wp
-      !else if ( abs(1.0_wp-abs(veckl(2))) .lt. eps ) then
-      !   veckl(1) = 0.0_wp
-      !   veckl(2) = sign(1.0_wp,veckl(2))
-      !   veckl(3) = 0.0_wp
-      !else if ( abs(1.0_wp-abs(veckl(3))) .lt. eps ) then
-      !   veckl(1) = 0.0_wp
-      !   veckl(2) = 0.0_wp
-      !   veckl(3) = sign(1.0_wp,veckl(3))
-      !else if ( (abs(veckl(1)) .lt. eps) .and. .not. eff_equality(veckl(1),0.0_wp) ) then
-      !   veckl(1) = 0.0_wp
-      !   sq = sqrt( veckl(2)**2 + veckl(3)**2 )
-      !   veckl(2) = veckl(2)/sq
-      !   veckl(3) = veckl(3)/sq
-      !else if ( (abs(veckl(2)) .lt. eps) .and. .not. eff_equality(veckl(2),0.0_wp) ) then
-      !   veckl(2) = 0.0_wp
-      !   sq = sqrt( veckl(1)**2 + veckl(3)**2 )
-      !   veckl(1) = veckl(1)/sq
-      !   veckl(3) = veckl(3)/sq
-      !else if ( (abs(veckl(3)) .lt. eps) .and. .not. eff_equality(veckl(3),0.0_wp) ) then
-      !   veckl(3) = 0.0_wp
-      !   sq = sqrt(veckl(1)**2 + veckl(2)**2)
-      !   veckl(1) = veckl(1)/sq
-      !   veckl(2) = veckl(2)/sq
-      !endif
-
-   end subroutine relvec
-
    logical pure function eff_equality(num1, num2)
       !> Numbers to compare
       real(wp), intent(in) :: num1, num2
@@ -236,15 +192,16 @@ contains
       eff_equality = (abs( num1 - num2 ) .le. 1.0e-12_wp)
    end function eff_equality
 
-   pure subroutine harmtr(maxl,veckl,trafomat)
+   pure subroutine harmtr(maxl,vec,trafomat)
       !> Maximum angular momentum
       integer, intent(in)  :: maxl
       !> Normalized vector from atom k to atom l
-      real(wp), intent(in) :: veckl(3)
+      real(wp), intent(in) :: vec(3)
       !> Transformation matrix
       real(wp), intent(out) :: trafomat(ndim(maxl+1),ndim(maxl+1))
 
       real(wp) :: cos2p, cos2t, cosp, cost, sin2p, sin2t, sinp, sint, sqrt3, len
+      real(wp) :: norm_vec(3)
 
       trafomat = 0.0_wp
       ! -----------------------------
@@ -254,22 +211,25 @@ contains
 
       if ( maxl == 0 ) return
       
-      len = sqrt(veckl(1)**2 + veckl(2)**2 + veckl(3)**2)
+      ! Normalize the vector
+      len = sqrt(sum(vec**2))
+      norm_vec = vec / len
+      
       ! Prepare spherical coordinats
-      cost = veckl(3) / len
+      cost = norm_vec(3)
       if ( abs(cost) .eq. 1.0_wp ) then
          sint = 0.0_wp
          cosp = 1.0_wp
          sinp = 0.0_wp
       else if ( abs(cost) .eq. 0.0_wp ) then
          sint = 1.0_wp
-         cosp = veckl(1)/len
-         sinp = veckl(2)/len
+         cosp = norm_vec(1)
+         sinp = norm_vec(2)
       else
          !sint = SQRT(1.0_wp-COST**2)
-         sint = SQRT(veckl(1)**2 + veckl(2)**2)
-         cosp = veckl(1)/SINT
-         sinp = veckl(2)/SINT
+         sint = SQRT(norm_vec(1)**2 + norm_vec(2)**2)
+         cosp = norm_vec(1)/SINT
+         sinp = norm_vec(2)/SINT
       endif
 
       ! -----------------------------
@@ -375,11 +335,11 @@ contains
    end subroutine harmtr
 
    !pure 
-   subroutine d_harmtr(maxl,veckl,trafomat, dtrafomat)
+   subroutine d_harmtr(maxl,vec,trafomat, dtrafomat)
       !> Maximum angular momentum
       integer, intent(in)  :: maxl
       !> Normalized vector from atom k to atom l
-      real(wp), intent(in) :: veckl(3)
+      real(wp), intent(in) :: vec(3)
       !> Transformation matrix
       real(wp), intent(out) :: trafomat(ndim(maxl+1),ndim(maxl+1))
       !> Transformation matrix
@@ -389,18 +349,16 @@ contains
       real(wp) :: trafomat_dt(ndim(maxl+1),ndim(maxl+1))
       !> Derivative of transformation matrix w.r.t. phi
       real(wp) :: trafomat_dp(ndim(maxl+1),ndim(maxl+1))
-      !!> Derivative of transformation matrix w.r.t. phi
-      !real(wp) :: trafomat_dpy(16,16)
 
       integer :: i,j
 
       real(wp) :: cos2p, cos2t, cosp, cost, sin2p, sin2t, sinp, sint, sqrt3, len
       real(wp) :: dcos2t, dsin2t, dcos2p, dsin2p, dpdx, dpdy, dpdz, dtdx, dtdy, dtdz
+      real(wp) :: norm_vec(3)
 
       trafomat = 0.0_wp
       trafomat_dt = 0.0_wp
       trafomat_dp = 0.0_wp
-      !trafomat_dpy = 0.0_wp
 
       ! -----------------------------
       ! *** s functions (trafomat(1x1)) ***
@@ -410,33 +368,33 @@ contains
 
       if ( maxl == 0 ) return
 
-      len = sqrt(veckl(1)**2 + veckl(2)**2 + veckl(3)**2)
-
+      ! Normalize the vector
+      len = sqrt(sum(vec**2))
+      norm_vec = vec / len
+      
       ! Prepare spherical coordinats
-      cost = veckl(3)/len
+      cost = norm_vec(3)
       if ( abs(cost) .eq. 1.0_wp ) then
          sint = 0.0_wp
          cosp = 1.0_wp
          sinp = 0.0_wp
       else if ( abs(cost) .eq. 0.0_wp ) then
          sint = 1.0_wp
-         cosp = veckl(1)
-         sinp = veckl(2)
+         cosp = norm_vec(1)
+         sinp = norm_vec(2)
       else
-         !sint = SQRT(1.0_wp-COST**2)
-         sint = SQRT(veckl(1)**2 + veckl(2)**2)
-         cosp = veckl(1)/SINT
-         sinp = veckl(2)/SINT
+         sint = SQRT(norm_vec(1)**2 + norm_vec(2)**2)
+         cosp = norm_vec(1)/SINT
+         sinp = norm_vec(2)/SINT
       endif
 
       ! Prepare sperical coordinate derivative
-      dpdx = -veckl(2) / (veckl(1)**2 + veckl(2)**2) ! SIGN????
-      dpdy = veckl(1) / (veckl(1)**2 + veckl(2)**2)
+      dpdx = -vec(2) / (vec(1)**2 + vec(2)**2) 
+      dpdy = vec(1) / (vec(1)**2 + vec(2)**2)
       dpdz = 0.0_wp
-      dtdx = veckl(1)*veckl(3) / (SQRT(veckl(1)**2 + veckl(2)**2)*len**2)
-      dtdy = veckl(2)*veckl(3) / (SQRT(veckl(1)**2 + veckl(2)**2)*len**2)
-      dtdz = SQRT(veckl(1)**2+veckl(2)**2) / len**2
-      !dtdz = -1.0_wp / SQRT(1.0_wp - veckl(3)**2)
+      dtdx = vec(1)*vec(3) / (SQRT(vec(1)**2 + vec(2)**2)*len**2)
+      dtdy = vec(2)*vec(3) / (SQRT(vec(1)**2 + vec(2)**2)*len**2)
+      dtdz = -SQRT(vec(1)**2+vec(2)**2) / len**2
       
       ! -----------------------------
       ! *** p functions (trafomat(4x4)) ***

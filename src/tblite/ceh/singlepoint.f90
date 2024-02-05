@@ -31,7 +31,7 @@ module tblite_ceh_singlepoint
    use tblite_wavefunction, only : wavefunction_type, &
    & get_alpha_beta_occupation
    use tblite_wavefunction_mulliken, only: get_mulliken_shell_charges, &
-   & get_mulliken_atomic_multipoles
+   & get_mulliken_atomic_multipoles, get_mulliken_shell_charges_gradient
    use tblite_scf_iterator, only: get_density, get_qat_from_qsh
    use tblite_scf, only: new_potential, potential_type 
    use tblite_container, only : container_cache
@@ -40,6 +40,7 @@ module tblite_ceh_singlepoint
    use tblite_blas, only : gemv
    use tblite_ceh_h0, only : get_hamiltonian, get_hamiltonian_gradient, &
    & get_scaled_selfenergy, get_occupation
+   use tblite_ceh_coupled_perturbed, only : get_density_matrix_gradient
    use tblite_xtb_spec, only : tb_h0spec 
    use tblite_xtb_calculator, only : xtb_calculator
    use tblite_timer, only : timer_type, format_time
@@ -108,7 +109,7 @@ contains
       !> CEH matrix element derivative arrays: 
       real(wp), allocatable :: dh0dr(:,:,:), dh0dL(:,:,:), doverlap(:,:,:)
       !> CEH density matrix derivative: 
-      real(wp), allocatable :: ddensity(:,:,:)      
+      real(wp), allocatable :: ddensitydr(:,:,:), ddensitydL(:,:,:)
 
       call timer%push("wall time CEH")
 
@@ -211,8 +212,9 @@ contains
       
       call timer%push("wall time CEH gradient")
       if (grad) then
-         allocate(ddensity(3,calc%bas%nao,calc%bas%nao),dh0dr(3,calc%bas%nao,calc%bas%nao),&
-         & dh0dL(3,calc%bas%nao,calc%bas%nao),doverlap(3,calc%bas%nao,calc%bas%nao))
+         allocate(dh0dr(3,calc%bas%nao,calc%bas%nao),&
+         & dh0dL(3,calc%bas%nao,calc%bas%nao),doverlap(3,calc%bas%nao,calc%bas%nao),&
+         &ddensitydr(3,calc%bas%nao,calc%bas%nao),ddensitydL(3,calc%bas%nao,calc%bas%nao))
          dh0dr(:, :, :) = 0.0_wp
          dh0dL(:, :, :) = 0.0_wp
          doverlap(:, :, :) = 0.0_wp
@@ -221,11 +223,11 @@ contains
             & dsedr, dsedL, pot, wfn%density, dh0dr, dh0dL, doverlap)
          ! Use the matrix element derivatives (F + S) to get the density matrix graidient
          ! based on the coupled-perturbed formalism
-         call get_density_matrix_gradient(wfn,doverlap,dh0dr,dh0dL,ddensitydr,ddensitydL)
+         call get_density_matrix_gradient(mol,calc%bas,wfn,list,doverlap,dh0dr,dh0dL,ddensitydr,ddensitydL)
 
          ! Derivative of the CEH Mulliken charges
          call get_mulliken_shell_charges_gradient(calc%bas, ints%overlap, wfn%density, &
-         & doverlap, ddensitydr, ddensitydL, wfn%dqdr, wfn%dqL)
+         & doverlap, ddensitydr, ddensitydL, wfn%dqdr, wfn%dqdL)
 
       end if 
       call timer%pop()

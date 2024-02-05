@@ -27,7 +27,6 @@ module tblite_ceh_h0
    use tblite_integral_dipole, only: get_dipole_integrals, dipole_cgto, &
    & dipole_cgto_diat_scal, maxl, msao
    use tblite_integral_overlap, only: overlap_grad_cgto_diat_scal, overlap_numgrad_cgto_diat_scal
-   use tblite_integral_diat_trafo, only: relvec
    use tblite_adjlist, only : adjacency_list
    use tblite_scf_potential, only : potential_type
 
@@ -158,7 +157,7 @@ contains
 
       integer  :: itr, img, inl, ii, jj, is, js, jzp, izp, nao
       integer  :: iat, ish, jat, jsh, k, iao, jao, ij
-      real(wp) :: hij, rr, r2, vec(3), vec_diat_trafo(3), dtmpj(3)
+      real(wp) :: hij, rr, r2, vec(3), dtmpj(3)
       real(wp), allocatable :: stmp(:), dtmpi(:, :), stmp_diat(:)
       integer :: kl, l
 
@@ -173,7 +172,7 @@ contains
       !$omp parallel do schedule(runtime) default(none) &
       !$omp shared(mol, bas, trans, list, overlap, overlap_diat, dpint, hamiltonian, h0, selfenergy) &
       !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, ij, k) &
-      !$omp private(r2, vec, vec_diat_trafo, stmp, stmp_diat, dtmpi, dtmpj, hij, rr, inl, img)
+      !$omp private(r2, vec, stmp, stmp_diat, dtmpi, dtmpj, hij, rr, inl, img)
       do iat = 1, mol%nat
          izp = mol%id(iat)
          is = bas%ish_at(iat)
@@ -186,14 +185,13 @@ contains
             vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
             r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
             rr = sqrt(sqrt(r2) / (h0%rad(jzp) + h0%rad(izp)))
-            call relvec(vec, sqrt(r2), vec_diat_trafo)
             do ish = 1, bas%nsh_id(izp)
                ii = bas%iao_sh(is+ish)
                do jsh = 1, bas%nsh_id(jzp)
                   jj = bas%iao_sh(js+jsh)
 
                   call dipole_cgto_diat_scal(bas%cgto(jsh,jzp), bas%cgto(ish,izp), r2, vec, &
-                  & bas%intcut, vec_diat_trafo, h0%ksig(izp,jzp), h0%kpi(izp,jzp), h0%kdel(izp,jzp), &
+                  & bas%intcut, h0%ksig(izp,jzp), h0%kpi(izp,jzp), h0%kdel(izp,jzp), &
                   & stmp, stmp_diat, dtmpi)
 
                   hij = 0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (selfenergy(is+ish) + selfenergy(js+jsh)) 
@@ -332,7 +330,7 @@ contains
    
       integer :: iat, jat, izp, jzp, itr, img, inl, spin, nspin
       integer :: ish, jsh, is, js, ii, jj, iao, jao, nao, ij, ji
-      real(wp) :: rr, r2, vec(3), vec_diat_trafo(3), cutoff2, hij, dG(3), hscale, hs
+      real(wp) :: rr, r2, vec(3), cutoff2, hij, dG(3), hscale, hs
       real(wp) :: shpolyi, shpolyj, shpoly, dshpoly, dsv(3)
       real(wp) :: sval, dcni, dcnj, dhdcni, dhdcnj, hpij, pij
       real(wp), allocatable :: stmp(:), stmp_diat(:) 
@@ -357,7 +355,7 @@ contains
       !$omp parallel do schedule(runtime) default(none) reduction(+:dEdcn, gradient, sigma) &
       !$omp shared(mol, bas, trans, h0, selfenergy, dsedcn, pot, pmat, xmat, list, nspin) &
       !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, ij, ji&
-      !$omp& r2, vec, vec_diat_trafo stmp, dstmp, hij, &
+      !$omp& r2, vec, stmp, dstmp, hij, &
       !$omp& dG, rr, sval, pij, inl, img)
       do iat = 1, mol%nat
          izp = mol%id(iat)
@@ -372,7 +370,6 @@ contains
             vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
             r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
             rr = sqrt(sqrt(r2) / (h0%rad(jzp) + h0%rad(izp)))
-            call relvec(vec, sqrt(r2), vec_diat_trafo)
             do ish = 1, bas%nsh_id(izp)
                ii = bas%iao_sh(is+ish)
                do jsh = 1, bas%nsh_id(jzp)
@@ -385,7 +382,7 @@ contains
 
                   ! overlap_grad_cgto_diat_scal
                   call overlap_numgrad_cgto_diat_scal(bas%cgto(jsh,jzp), bas%cgto(ish,izp), r2, vec, &
-                  & bas%intcut, vec_diat_trafo, h0%ksig(izp,jzp), h0%kpi(izp,jzp), h0%kdel(izp,jzp), &
+                  & bas%intcut, h0%ksig(izp,jzp), h0%kpi(izp,jzp), h0%kdel(izp,jzp), &
                   & stmp, dstmp, stmp_diat, dstmp_diat)
 
                   !write(*,*) "dsedr", dsedr
@@ -461,7 +458,7 @@ contains
 !
             !   hij = 0.5_wp         * h0%hscale(ish, ish, izp, izp)
             !   call overlap_grad_cgto_diat_scal(bas%cgto(ish,izp), bas%cgto(ish,izp), r2, vec, &
-            !         & bas%intcut, vec_diat_trafo, h0%ksig(izp,izp), h0%kpi(izp,izp), h0%kdel(izp,izp), &
+            !         & bas%intcut, h0%ksig(izp,izp), h0%kpi(izp,izp), h0%kdel(izp,izp), &
             !         & stmp, dstmp, stmp_diat, dstmp_diat)
             !   
             !   nao = msao(bas%cgto(jsh, izp)%ang)
