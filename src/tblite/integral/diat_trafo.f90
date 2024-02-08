@@ -115,6 +115,9 @@ contains
       ! 1. Setup the transformation matrix and its derivative
       call d_harmtr(maxl, vec, trafomat, dtrafomat)
 
+      ! call write_2d_matrix(dtrafomat(2,:,:), "dtrafomat", step=9)
+      ! call write_2d_matrix(trafomat, "trafomat", step=9)
+
       ! 2. Transform the overlap submatrix to the diatomic frame
       ! interm_s = matmul(matmul(transpose(trafomat), block_overlap),trafomat)
       if (maxl > 0) then
@@ -142,6 +145,7 @@ contains
       ! 3. Scale overlap and each dimension of the derivative in the diatomic frame
       call scale_diatomic_frame(interm_oso, ksig, kpi, kdel, maxl) 
       do ic = 1, 3
+         write(*,*) "ic", ic
          call scale_diatomic_frame(interm_doso(ic,:,:), ksig, kpi, kdel, maxl)
          call scale_diatomic_frame(interm_osdo(ic,:,:), ksig, kpi, kdel, maxl) 
          call scale_diatomic_frame(interm_odso(ic,:,:), ksig, kpi, kdel, maxl) 
@@ -157,22 +161,18 @@ contains
             ! block_doverlap = dO * S' * O^T + O * S' * dO^T
             call gemm(amat=dtrafomat(ic,:,:),bmat=interm_oso,cmat=tmp,transa='N',transb='N')
             call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
-            ! block_doverlap = dO * S' * O^T + O * S' * dO^T
+
             call gemm(amat=trafomat,bmat=interm_oso,cmat=tmp,transa='N',transb='N')
             call gemm(alpha=1.0_wp,amat=tmp,bmat=dtrafomat(ic,:,:),beta=1.0_wp,&
             &cmat=block_doverlap(ic,:,:),transa='N',transb='T')
             
-            !eff_block_doverlap(ic,:,:) = tmp2 !+ transpose(tmp2)
-
-            ! block_doverlap += O * ((dOSO)' + (OdSO)' + (OSdO)') * O^T 
-
-            !tmp2 = interm_doso(ic,:,:) + interm_odso(ic,:,:) + interm_osdo(ic,:,:)
+            ! block_doverlap += O * dS' * O^T 
             call gemm(amat=trafomat,bmat=interm_doso(ic,:,:),cmat=tmp,transa='N',transb='N')
             call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat,beta=1.0_wp,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
 
             call gemm(amat=trafomat,bmat=interm_odso(ic,:,:),cmat=tmp,transa='N',transb='N')
             call gemm(amat=tmp,bmat=trafomat,beta=1.0_wp,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
-
+            
             call gemm(amat=trafomat,bmat=interm_osdo(ic,:,:),cmat=tmp,transa='N',transb='N')
             call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat,beta=1.0_wp,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
          end do
@@ -345,6 +345,8 @@ contains
       !> Transformation matrix
       real(wp), intent(out) :: dtrafomat(3,ndim(maxl+1),ndim(maxl+1))
       
+      real(wp), parameter              :: eps = 1.0e-08_wp
+
       !> Derivative of transformation matrix w.r.t. theta
       real(wp) :: trafomat_dt(ndim(maxl+1),ndim(maxl+1))
       !> Derivative of transformation matrix w.r.t. phi
@@ -354,7 +356,7 @@ contains
 
       real(wp) :: cos2p, cos2t, cosp, cost, sin2p, sin2t, sinp, sint, sqrt3, len
       real(wp) :: dcos2t, dsin2t, dcos2p, dsin2p, dpdx, dpdy, dpdz, dtdx, dtdy, dtdz
-      real(wp) :: norm_vec(3)
+      real(wp) :: norm_vec(3), sq
 
       trafomat = 0.0_wp
       trafomat_dt = 0.0_wp
@@ -371,6 +373,36 @@ contains
       ! Normalize the vector
       len = sqrt(sum(vec**2))
       norm_vec = vec / len
+
+      if ( abs(1.0_wp-abs(norm_vec(1))) .lt. eps ) then
+         norm_vec(1) = sign(1.0_wp,norm_vec(1))
+         norm_vec(2) = 0.0_wp
+         norm_vec(3) = 0.0_wp
+      else if ( abs(1.0_wp-abs(norm_vec(2))) .lt. eps ) then
+         norm_vec(1) = 0.0_wp
+         norm_vec(2) = sign(1.0_wp,norm_vec(2))
+         norm_vec(3) = 0.0_wp
+      else if ( abs(1.0_wp-abs(norm_vec(3))) .lt. eps ) then
+         norm_vec(1) = 0.0_wp
+         norm_vec(2) = 0.0_wp
+         norm_vec(3) = sign(1.0_wp,norm_vec(3))
+      else if ( (abs(norm_vec(1)) .lt. eps) .and. .not. eff_equality(norm_vec(1),0.0_wp) ) then
+         norm_vec(1) = 0.0_wp
+         sq = sqrt( norm_vec(2)**2 + norm_vec(3)**2 )
+         norm_vec(2) = norm_vec(2)/sq
+         norm_vec(3) = norm_vec(3)/sq
+      else if ( (abs(norm_vec(2)) .lt. eps) .and. .not. eff_equality(norm_vec(2),0.0_wp) ) then
+         norm_vec(2) = 0.0_wp
+         sq = sqrt( norm_vec(1)**2 + norm_vec(3)**2 )
+         norm_vec(1) = norm_vec(1)/sq
+         norm_vec(3) = norm_vec(3)/sq
+      else if ( (abs(norm_vec(3)) .lt. eps) .and. .not. eff_equality(norm_vec(3),0.0_wp) ) then
+         norm_vec(3) = 0.0_wp
+         sq = sqrt(norm_vec(1)**2 + norm_vec(2)**2)
+         norm_vec(1) = norm_vec(1)/sq
+         norm_vec(2) = norm_vec(2)/sq
+      endif
+
       
       ! Prepare spherical coordinats
       cost = norm_vec(3)
@@ -389,12 +421,62 @@ contains
       endif
 
       ! Prepare sperical coordinate derivative
-      dpdx = -vec(2) / (vec(1)**2 + vec(2)**2) 
-      dpdy = vec(1) / (vec(1)**2 + vec(2)**2)
+      if(norm_vec(1)**2 + norm_vec(2)**2 .lt. eps) then
+         write(*,*) "in if"
+         dpdx = -1.0_wp
+         dpdy = 1.0_wp
+         dtdx = 0.0_wp
+         dtdy = 0.0_wp
+      else
+         write(*,*) "in else"
+
+         dpdx = -vec(2) / (vec(1)**2 + vec(2)**2) 
+         dpdy = vec(1) / (vec(1)**2 + vec(2)**2)
+         dtdx = vec(1)*vec(3) / (SQRT(vec(1)**2 + vec(2)**2)*len**2)
+         dtdy = vec(2)*vec(3) / (SQRT(vec(1)**2 + vec(2)**2)*len**2)
+      end if 
       dpdz = 0.0_wp
-      dtdx = vec(1)*vec(3) / (SQRT(vec(1)**2 + vec(2)**2)*len**2)
-      dtdy = vec(2)*vec(3) / (SQRT(vec(1)**2 + vec(2)**2)*len**2)
       dtdz = -SQRT(vec(1)**2+vec(2)**2) / len**2
+
+      write(*,*) "first"
+      write(*,*) "dpdx", dpdx
+      write(*,*) "dpdy", dpdy
+      write(*,*) "dpdz", dpdz
+      write(*,*) "dtdx", dtdx
+      write(*,*) "dtdy", dtdy
+      write(*,*) "dtdz", dtdz
+
+
+
+      ! Prepare sperical coordinate derivative
+      if(norm_vec(1)**2 + norm_vec(2)**2 .lt. eps) then
+         write(*,*) "in if"
+         dpdx = -1.0_wp
+         dpdy = 1.0_wp
+      else
+         write(*,*) "in else"
+
+         dpdx = -sinp / sqrt(vec(1)**2 + vec(2)**2) 
+         dpdy = cosp / sqrt(vec(1)**2 + vec(2)**2)
+
+      end if 
+      ! dpdx = -sinp / sqrt(vec(1)**2 + vec(2)**2) 
+      ! dpdy = cosp / sqrt(vec(1)**2 + vec(2)**2)
+      dpdz = 0.0_wp
+
+      dtdx = cost * cosp / len
+      dtdy = cost * sinp / len
+      dtdz = -sint / len
+
+      write(*,*) "second"
+      write(*,*) "dpdx", dpdx
+      write(*,*) "dpdy", dpdy
+      write(*,*) "dpdz", dpdz
+      write(*,*) "dtdx", dtdx
+      write(*,*) "dtdy", dtdy
+      write(*,*) "dtdz", dtdz
+
+      ! write(*,*) "derives phi, theta", dpdx, dpdy, dtdx, dtdy
       
       ! -----------------------------
       ! *** p functions (trafomat(4x4)) ***
@@ -605,7 +687,8 @@ contains
 
    end subroutine d_harmtr
 
-   pure subroutine scale_diatomic_frame(diat_mat, ksig, kpi, kdel, maxl)
+   !pure 
+   subroutine scale_diatomic_frame(diat_mat, ksig, kpi, kdel, maxl)
       !> Block matrix in the diatomic frame to be scaled
       real(wp),intent(inout)    :: diat_mat(:,:)
       !> Scaling parameters for different bonding contributions
@@ -613,16 +696,39 @@ contains
       !> Highest angular momentum between the two shells
       integer,intent(in)        :: maxl
 
+      ! call write_2d_matrix(diat_mat, "diat_mat", step=9)
+
+
+
       diat_mat(1,1) = diat_mat(1,1)*ksig ! Sigma bond s   <-> s
       if (maxl > 0) then
          diat_mat(1,3) = diat_mat(1,3)*ksig ! Sigma bond s   <-> pz
          diat_mat(3,1) = diat_mat(3,1)*ksig ! Sigma bond pz  <-> s
+         
+         !Gradient
+         diat_mat(1,2) = diat_mat(1,2)*ksig ! Sigma bond s   <-> pz
+         diat_mat(2,1) = diat_mat(2,1)*ksig ! Sigma bond pz  <-> s
+         diat_mat(1,4) = diat_mat(1,4)*ksig ! Sigma bond s   <-> pz
+         diat_mat(4,1) = diat_mat(4,1)*ksig ! Sigma bond pz  <-> s
+
+
          diat_mat(3,3) = diat_mat(3,3)*ksig ! Sigma bond pz  <-> pz
          diat_mat(4,4) = diat_mat(4,4)*kpi  ! Pi    bond px  <-> px
          diat_mat(2,2) = diat_mat(2,2)*kpi  ! Pi    bond py  <-> py
          if (maxl > 1) then
             diat_mat(5,1) = diat_mat(5,1)*ksig ! Sigma bond dz2 <-> s
             diat_mat(1,5) = diat_mat(1,5)*ksig ! Sigma bond s   <-> dz2
+
+            ! Gradient
+            diat_mat(6,1) = diat_mat(6,1)*ksig ! Sigma bond dz2 <-> s
+            diat_mat(1,6) = diat_mat(1,6)*ksig ! Sigma bond s   <-> dz2
+            diat_mat(7,1) = diat_mat(7,1)*ksig ! Sigma bond dz2 <-> s
+            diat_mat(1,7) = diat_mat(1,7)*ksig ! Sigma bond s   <-> dz2
+            diat_mat(8,1) = diat_mat(8,1)*ksig ! Sigma bond dz2 <-> s
+            diat_mat(1,8) = diat_mat(1,8)*ksig ! Sigma bond s   <-> dz2
+            diat_mat(9,1) = diat_mat(9,1)*ksig ! Sigma bond dz2 <-> s
+            diat_mat(1,9) = diat_mat(1,9)*ksig ! Sigma bond s   <-> dz2
+
             diat_mat(3,5) = diat_mat(3,5)*ksig ! Sigma bond pz  <-> dz2
             diat_mat(5,3) = diat_mat(5,3)*ksig ! Sigma bond dz2 <-> pz
             diat_mat(5,5) = diat_mat(5,5)*ksig ! Sigma bond dz2 <-> dz2
@@ -638,6 +744,7 @@ contains
          ! f-functions remain unscaled
       endif
 
+      ! call write_2d_matrix(diat_mat, "diat_mat after", step=9)
    end subroutine scale_diatomic_frame
 
 

@@ -199,8 +199,7 @@ pure subroutine wrap_sgemm(amat, bmat, cmat, transa, transb, alpha, beta)
 end subroutine wrap_sgemm
 
 
-!pure 
-subroutine wrap_dgemm(amat, bmat, cmat, transa, transb, alpha, beta)
+pure subroutine wrap_dgemm(amat, bmat, cmat, transa, transb, alpha, beta)
    real(dp), intent(in) :: amat(:, :)
    real(dp), intent(in) :: bmat(:, :)
    real(dp), intent(inout) :: cmat(:, :)

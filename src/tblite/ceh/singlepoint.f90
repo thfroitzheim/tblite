@@ -107,7 +107,7 @@ contains
       !> periodicity
       real(wp), allocatable :: lattr(:, :)
       !> CEH matrix element derivative arrays: 
-      real(wp), allocatable :: dh0dr(:,:,:), dh0dL(:,:,:), doverlap(:,:,:)
+      real(wp), allocatable :: dh0dr(:,:,:), dh0dL(:,:,:), doverlap(:,:,:), doverlap_diat(:,:,:)
       !> CEH density matrix derivative: 
       real(wp), allocatable :: ddensitydr(:,:,:), ddensitydL(:,:,:)
 
@@ -213,14 +213,14 @@ contains
       call timer%push("wall time CEH gradient")
       if (grad) then
          allocate(dh0dr(3,calc%bas%nao,calc%bas%nao),&
-         & dh0dL(3,calc%bas%nao,calc%bas%nao),doverlap(3,calc%bas%nao,calc%bas%nao),&
+         & dh0dL(3,calc%bas%nao,calc%bas%nao),doverlap(3,calc%bas%nao,calc%bas%nao),doverlap_diat(3,calc%bas%nao,calc%bas%nao),&
          &ddensitydr(3,calc%bas%nao,calc%bas%nao),ddensitydL(3,calc%bas%nao,calc%bas%nao))
          dh0dr(:, :, :) = 0.0_wp
          dh0dL(:, :, :) = 0.0_wp
          doverlap(:, :, :) = 0.0_wp
          ! Get the derivative of the Fock matrix elements
          call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
-            & dsedr, dsedL, pot, wfn%density, dh0dr, dh0dL, doverlap)
+            & dsedr, dsedL, pot, wfn%density, dh0dr, dh0dL, doverlap, doverlap_diat)
          ! Use the matrix element derivatives (F + S) to get the density matrix graidient
          ! based on the coupled-perturbed formalism
          call get_density_matrix_gradient(mol,calc%bas,wfn,list,doverlap,dh0dr,dh0dL,ddensitydr,ddensitydL)

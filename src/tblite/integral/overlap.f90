@@ -20,7 +20,7 @@
 !> Implementation of overlap integrals
 module tblite_integral_overlap
    use iso_fortran_env, only: output_unit
-   
+
    use mctc_env, only : wp
    use mctc_io, only : structure_type
    use mctc_io_constants, only : pi
@@ -600,6 +600,8 @@ subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
    call transform0(cgtoj%ang, cgtoi%ang, s3d, overlap)
    call transform1(cgtoj%ang, cgtoi%ang, ds3d, doverlap)
    
+  ! write(*,*) "doverlap", doverlap
+   
    ! ---------- OVERLAP SCALING IN THE DIATOMIC FRAME ----------- 
    ! Transform 9x9 submatrix (in the case with s,p,d) to diatomic frame,
    ! scale the elements with the corresponding factor,
@@ -628,135 +630,9 @@ subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
      & block_doverlap(:, offset_nao(cgtoj%ang+1)+1:offset_nao(cgtoj%ang+1)+msao(cgtoj%ang), &
      & offset_nao(cgtoi%ang+1)+1:offset_nao(cgtoi%ang+1)+msao(cgtoi%ang))
    
-   ! ! After we have transformed and scaled the overlap itself, 
-   ! ! we do the same for each dimension of the derivative of the overlap. 
-   ! do ic = 1, 3
-   !    !> reinitialize the submatrix for each dimension to 0 
-   !    block_doverlap = 0.0_wp
-   !    !> 1. Fill the 9x9 submatrix for each dimension with the derivative matrix elements
-   !    block_doverlap(offset_nao(cgtoj%ang+1)+1:offset_nao(cgtoj%ang+1)+msao(cgtoj%ang), &
-   !      & offset_nao(cgtoi%ang+1)+1:offset_nao(cgtoi%ang+1)+msao(cgtoi%ang)) = &
-   !      & doverlap(ic,1:msao(cgtoj%ang), 1:msao(cgtoi%ang))
-   !    !> 2. Set up and perform the transformation
-   !     diat_trafo_grad(block_overlap, block_doverlap, vec_diat_trafo, ksig, kpi, kdel, maxl)
-   !    call diat_trafo_grad(block_doverlap, vec_diat_trafo, ksig, kpi, kdel, max(cgtoj%ang,cgtoi%ang))      
-   !    !> 3. Fill the doverlap_scaled matrix with the back-transformed submatrix for each dimension
-   !    doverlap_scaled(ic, 1:msao(cgtoj%ang), 1:msao(cgtoi%ang)) = &
-   !      & block_doverlap(offset_nao(cgtoj%ang+1)+1:offset_nao(cgtoj%ang+1)+msao(cgtoj%ang), &
-   !      & offset_nao(cgtoi%ang+1)+1:offset_nao(cgtoi%ang+1)+msao(cgtoi%ang))
-   ! end do  
-   ! ----------------------------------------------------------------
+  ! write(*,*) "doverlap_scaled", doverlap_scaled
    
 end subroutine overlap_grad_cgto_diat_scal
-
-
-! pure subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
-! &  vec_diat_trafo, ksig, kpi, kdel, overlap, doverlap, overlap_scaled, doverlap_scaled)
-!    !> Description of contracted Gaussian function on center i
-!    type(cgto_type), intent(in) :: cgtoi
-!    !> Description of contracted Gaussian function on center j
-!    type(cgto_type), intent(in) :: cgtoj
-!    !> Square distance between center i and j
-!    real(wp), intent(in) :: r2
-!    !> Distance vector between center i and j, ri - rj
-!    real(wp), intent(in) :: vec(3)
-!    !> Transformation vector for the diatomic frame
-!    real(wp), intent(in) :: vec_diat_trafo(3)
-!    !> Scaling factors for the diatomic frame for the three differnt bonding motifs
-!    real(wp), intent(in) :: ksig, kpi, kdel
-!    !> Maximum value of integral prefactor to consider
-!    real(wp), intent(in) :: intcut
-!    !> Overlap integrals for the given pair i  and j
-!    real(wp), intent(out) :: overlap(msao(cgtoj%ang), msao(cgtoi%ang))
-!    !> Overlap integral gradient for the given pair i  and j
-!    real(wp), intent(out) :: doverlap(3, msao(cgtoj%ang), msao(cgtoi%ang))
-!    !> Overlap integrals for the given pair i  and j
-!    real(wp), intent(out) :: overlap_scaled(msao(cgtoj%ang), msao(cgtoi%ang))
-!    !> Overlap integral gradient for the given pair i  and j
-!    real(wp), intent(out) :: doverlap_scaled(3, msao(cgtoj%ang), msao(cgtoi%ang))
-
-!    !> Block overlap matrix as a technical intermediate for the diatomic frame
-!    !> The derivative is for each dimension (x,y,z) separate
-!    real(wp) :: block_overlap(9,9)
-!    real(wp) :: block_doverlap(9,9) 
-!    !> Offset array for the block overlap matrix 
-!    !> (number of AOs that appear before the current angular momentum)
-!    integer, parameter :: offset_nao(8) = [0, 1, 4, 9, 16, 25, 36, 49]
-
-!    integer :: ip, jp, mli, mlj, l, k
-!    real(wp) :: eab, oab, est, s1d(0:maxl2), rpi(3), rpj(3), cc, val, grad(3), pre
-!    real(wp) :: s3d(mlao(cgtoj%ang), mlao(cgtoi%ang))
-!    real(wp) :: ds3d(3, mlao(cgtoj%ang), mlao(cgtoi%ang))
-
-!    s3d(:, :) = 0.0_wp
-!    ds3d(:, :, :) = 0.0_wp
-
-!    do ip = 1, cgtoi%nprim
-!       do jp = 1, cgtoj%nprim
-!          eab = cgtoi%alpha(ip) + cgtoj%alpha(jp)
-!          oab = 1.0_wp/eab
-!          est = cgtoi%alpha(ip) * cgtoj%alpha(jp) * r2 * oab
-!          if (est > intcut) cycle
-!          pre = exp(-est) * sqrtpi3*sqrt(oab)**3
-!          rpi = -vec * cgtoj%alpha(jp) * oab
-!          rpj = +vec * cgtoi%alpha(ip) * oab
-!          do l = 0, cgtoi%ang + cgtoj%ang + 1
-!             s1d(l) = overlap_1d(l, eab)
-!          end do
-!          cc = cgtoi%coeff(ip) * cgtoj%coeff(jp) * pre
-!          do mli = 1, mlao(cgtoi%ang)
-!             do mlj = 1, mlao(cgtoj%ang)
-!                call overlap_grad_3d(rpj, rpi, cgtoj%alpha(jp), cgtoi%alpha(ip), &
-!                   & lx(:, mlj+lmap(cgtoj%ang)), lx(:, mli+lmap(cgtoi%ang)), &
-!                   & s1d, val, grad)
-!                s3d(mlj, mli) = s3d(mlj, mli) + cc*val
-!                ds3d(:, mlj, mli) = ds3d(:, mlj, mli) + cc*grad
-!             end do
-!          end do
-!       end do
-!    end do
-
-!    call transform0(cgtoj%ang, cgtoi%ang, s3d, overlap)
-!    call transform1(cgtoj%ang, cgtoi%ang, ds3d, doverlap)
-
-!    !> ---------- OVERLAP SCALING IN THE DIATOMIC FRAME ----------- 
-!    !> Transform 9x9 submatrix (in the case with s,p,d) to diatomic frame,
-!    !> scale the elements with the corresponding factor,
-!    !> transform them back and add them to the scaled overlap matrix
-!    block_overlap = 0.0_wp
-!    !> 1. Fill the 9x9 submatrix (initialized with 0's)
-!    !> with the correct overlap matrix elements
-!    block_overlap(offset_nao(cgtoj%ang+1)+1:offset_nao(cgtoj%ang+1)+msao(cgtoj%ang), &
-!      & offset_nao(cgtoi%ang+1)+1:offset_nao(cgtoi%ang+1)+msao(cgtoi%ang)) = &
-!      & overlap(1:msao(cgtoj%ang), 1:msao(cgtoi%ang))
-!    !> 2. Set up transformation matrix, transform the submatrix,
-!    !> scale the elements with the corresponding factor, transform back 
-!    !> according to: trans_block_s = O^T * S * O
-!    call diat_trafo(block_overlap, vec_diat_trafo, ksig, kpi, kdel, max(cgtoj%ang,cgtoi%ang))
-!    !> 3. Fill the overlap_scaled matrix with the back-transformed submatrix
-!    overlap_scaled(1:msao(cgtoj%ang), 1:msao(cgtoi%ang)) = &
-!      & block_overlap(offset_nao(cgtoj%ang+1)+1:offset_nao(cgtoj%ang+1)+msao(cgtoj%ang), &
-!      & offset_nao(cgtoi%ang+1)+1:offset_nao(cgtoi%ang+1)+msao(cgtoi%ang))
-   
-!    !> After we have transformed and scaled the overlap itself, 
-!    !> we do the same for each dimension of the derivative of the overlap. 
-!    do k = 1, 3
-!       !> reinitialize the submatrix for each dimension to 0 
-!       block_doverlap = 0.0_wp
-!       !> 1. Fill the 9x9 submatrix for each dimension with the derivative matrix elements
-!       block_doverlap(offset_nao(cgtoj%ang+1)+1:offset_nao(cgtoj%ang+1)+msao(cgtoj%ang), &
-!         & offset_nao(cgtoi%ang+1)+1:offset_nao(cgtoi%ang+1)+msao(cgtoi%ang)) = &
-!         & doverlap(k,1:msao(cgtoj%ang), 1:msao(cgtoi%ang))
-!       !> 2. Set up and perform the transformation
-!       call diat_trafo(block_doverlap, vec_diat_trafo, ksig, kpi, kdel, max(cgtoj%ang,cgtoi%ang))      
-!       !> 3. Fill the doverlap_scaled matrix with the back-transformed submatrix for each dimension
-!       doverlap_scaled(k,1:msao(cgtoj%ang), 1:msao(cgtoi%ang)) = &
-!         & block_doverlap(offset_nao(cgtoj%ang+1)+1:offset_nao(cgtoj%ang+1)+msao(cgtoj%ang), &
-!         & offset_nao(cgtoi%ang+1)+1:offset_nao(cgtoi%ang+1)+msao(cgtoi%ang))
-!    end do  
-!    !> ----------------------------------------------------------------
-
-! end subroutine overlap_grad_cgto_diat_scal
 
 
 !> Evaluate overlap for a molecular structure
