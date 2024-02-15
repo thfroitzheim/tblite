@@ -339,13 +339,12 @@ pure subroutine overlap_cgto(cgtoj, cgtoi, r2, vec, intcut, overlap)
 
 end subroutine overlap_cgto
 
-! pure
-subroutine overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, & 
+pure subroutine overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, & 
 & ksig, kpi, kdel, overlap, overlap_scaled)
-   !> Description of contracted Gaussian function on center i
-   type(cgto_type), intent(in) :: cgtoi
    !> Description of contracted Gaussian function on center j
    type(cgto_type), intent(in) :: cgtoj
+   !> Description of contracted Gaussian function on center i
+   type(cgto_type), intent(in) :: cgtoi
    !> Square distance between center i and j
    real(wp), intent(in) :: r2
    !> Distance vector between center i and j, ri - rj
@@ -421,10 +420,10 @@ end subroutine overlap_cgto_diat_scal
 
 
 pure subroutine overlap_grad_cgto(cgtoj, cgtoi, r2, vec, intcut, overlap, doverlap)
-   !> Description of contracted Gaussian function on center i
-   type(cgto_type), intent(in) :: cgtoi
    !> Description of contracted Gaussian function on center j
    type(cgto_type), intent(in) :: cgtoj
+   !> Description of contracted Gaussian function on center i
+   type(cgto_type), intent(in) :: cgtoi
    !> Square distance between center i and j
    real(wp), intent(in) :: r2
    !> Distance vector between center i and j, ri - rj
@@ -531,8 +530,7 @@ subroutine overlap_numgrad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
 end subroutine overlap_numgrad_cgto_diat_scal
 
 
-!pure 
-subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
+pure subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
 &  ksig, kpi, kdel, overlap, doverlap, overlap_scaled, doverlap_scaled)
    !> Description of contracted Gaussian function on center i
    type(cgto_type), intent(in) :: cgtoi
@@ -792,13 +790,6 @@ subroutine get_overlap_diatframe_lat(mol, trans, cutoff, bas, scal_fac, overlap,
    end do
 
 end subroutine get_overlap_diatframe_lat
-
-
-
-
-
-
-
 
 
 

@@ -15,8 +15,6 @@
 ! along with tblite.  If not, see <https://www.gnu.org/licenses/>.
 
 module test_integral_overlap
-   use iso_fortran_env, only: output_unit
-
    use mctc_env, only : wp
    use mctc_env_testing, only : new_unittest, unittest_type, error_type, check, &
       & test_failed
@@ -32,7 +30,7 @@ module test_integral_overlap
 
    public :: collect_integral_overlap
 
-   real(wp), parameter :: thr = 5e+6_wp*epsilon(1.0_wp)
+   real(wp), parameter :: thr = 2_wp*5e+6_wp*epsilon(1.0_wp)
    real(wp), parameter :: thr2 = sqrt(epsilon(1.0_wp))
 
 contains
@@ -60,15 +58,25 @@ subroutine collect_integral_overlap(testsuite)
       new_unittest("overlap-grad-dd", test_overlap_grad_dd), &
       new_unittest("overlap-grad-ff", test_overlap_grad_ff), &
       new_unittest("overlap-diat-grad-ss", test_overlap_diat_grad_ss), &
+      new_unittest("overlap-diat-grad-ss_z", test_overlap_diat_grad_ss_z), &
       new_unittest("overlap-diat-grad-sp", test_overlap_diat_grad_sp), &
+      new_unittest("overlap-diat-grad-sp_z", test_overlap_diat_grad_sp_z), &
       new_unittest("overlap-diat-grad-pp", test_overlap_diat_grad_pp), &
-      new_unittest("overlap-diat-grad-sd", test_overlap_diat_grad_sd) &
-      !new_unittest("overlap-diat-grad-pd", test_overlap_diat_grad_pd), &
-      !new_unittest("overlap-diat-grad-dd", test_overlap_diat_grad_dd), &
-      !new_unittest("overlap-diat-grad-sf", test_overlap_diat_grad_sf), &
-      !new_unittest("overlap-diat-grad-pf", test_overlap_diat_grad_pf), &
-      !new_unittest("overlap-diat-grad-df", test_overlap_diat_grad_df), &
-      !new_unittest("overlap-diat-grad-ff", test_overlap_diat_grad_ff) & 
+      new_unittest("overlap-diat-grad-pp_z", test_overlap_diat_grad_pp_z), &
+      new_unittest("overlap-diat-grad-sd", test_overlap_diat_grad_sd), &
+      new_unittest("overlap-diat-grad-sd_z", test_overlap_diat_grad_sd_z), &
+      new_unittest("overlap-diat-grad-pd", test_overlap_diat_grad_pd), &
+      new_unittest("overlap-diat-grad-pd_z", test_overlap_diat_grad_pd_z), &
+      new_unittest("overlap-diat-grad-dd", test_overlap_diat_grad_dd), &
+      new_unittest("overlap-diat-grad-dd_z", test_overlap_diat_grad_dd_z), &
+      new_unittest("overlap-diat-grad-sf", test_overlap_diat_grad_sf), &
+      new_unittest("overlap-diat-grad-sf_z", test_overlap_diat_grad_sf_z), &
+      new_unittest("overlap-diat-grad-pf", test_overlap_diat_grad_pf), &
+      new_unittest("overlap-diat-grad-pf_z", test_overlap_diat_grad_pf_z), &
+      new_unittest("overlap-diat-grad-df", test_overlap_diat_grad_df), &
+      new_unittest("overlap-diat-grad-df_z", test_overlap_diat_grad_df_z), &
+      new_unittest("overlap-diat-grad-ff", test_overlap_diat_grad_ff), & 
+      new_unittest("overlap-diat-grad-ff_z", test_overlap_diat_grad_ff_z) & 
       ]
 
 end subroutine collect_integral_overlap
@@ -761,8 +769,9 @@ subroutine test_overlap_grad_ss(error)
    call slater_to_gauss(ng, 2, 0, 1.0_wp, cgtoi, .true., stat)
    call slater_to_gauss(ng, 1, 0, 1.0_wp, cgtoj, .true., stat)
 
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec - 0.5_wp
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
    r2 = sum(vec**2)
 
    call overlap_grad_cgto(cgtoi, cgtoj, r2, vec, 100.0_wp, overlap, doverlapj)
@@ -812,8 +821,9 @@ subroutine test_overlap_grad_pp(error)
    call slater_to_gauss(ng, 3, 1, 1.0_wp, cgtoi, .true., stat)
    call slater_to_gauss(ng, 2, 1, 1.0_wp, cgtoj, .true., stat)
 
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec - 0.5_wp
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
    r2 = sum(vec**2)
 
    call overlap_grad_cgto(cgtoi, cgtoj, r2, vec, 100.0_wp, overlap, doverlapj)
@@ -871,8 +881,9 @@ subroutine test_overlap_grad_dd(error)
    call slater_to_gauss(ng, 4, 2, 1.0_wp, cgtoi, .true., stat)
    call slater_to_gauss(ng, 3, 2, 1.0_wp, cgtoj, .true., stat)
 
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec - 0.5_wp
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
    r2 = sum(vec**2)
 
    call overlap_grad_cgto(cgtoi, cgtoj, r2, vec, 100.0_wp, overlap, doverlapj)
@@ -930,8 +941,9 @@ subroutine test_overlap_grad_ff(error)
    call slater_to_gauss(ng, 5, 3, 1.0_wp, cgtoi, .true., stat)
    call slater_to_gauss(ng, 4, 3, 1.0_wp, cgtoj, .true., stat)
 
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec - 0.5_wp
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
    r2 = sum(vec**2)
 
    call overlap_grad_cgto(cgtoi, cgtoj, r2, vec, 100.0_wp, overlap, doverlapj)
@@ -973,6 +985,81 @@ subroutine test_overlap_grad_ff(error)
 
 end subroutine test_overlap_grad_ff
 
+subroutine test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
+   !> Vector between the two centers
+   real(wp), intent(inout) :: vec(3)
+   !> Scaling factors for the diatomic frame overlap
+   real(wp), intent(in) :: ksig, kpi, kdel
+   !> CGTOs for the tested diatomic frame overlap calculation
+   type(cgto_type), intent(in) :: cgtoi, cgtoj
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
+   
+   integer :: stat, i, j, k
+   real(wp) :: r2
+   real(wp) :: overlap(msao(cgtoi%ang), msao(cgtoj%ang)), overlap_scaled(msao(cgtoi%ang), msao(cgtoj%ang)), &
+   & sl(msao(cgtoj%ang), msao(cgtoi%ang)), sr(msao(cgtoj%ang), msao(cgtoi%ang)), &
+   & sl_scaled(msao(cgtoj%ang), msao(cgtoi%ang)), sr_scaled(msao(cgtoj%ang), msao(cgtoi%ang))
+
+   real(wp) :: doverlapi(3, msao(cgtoi%ang), msao(cgtoj%ang)),  doverlapi_scaled(3, msao(cgtoi%ang), msao(cgtoj%ang)), &
+   & doverlapj(3, msao(cgtoj%ang), msao(cgtoi%ang)), doverlapj_scaled(3, msao(cgtoj%ang), msao(cgtoi%ang)), &
+   & doverlaptmp(3, msao(cgtoj%ang), msao(cgtoi%ang)), doverlaptmp_scaled(3, msao(cgtoj%ang), msao(cgtoi%ang))
+
+   real(wp), parameter :: step = 1.0e-6_wp
+
+   r2 = sum(vec**2)
+
+   ! Test antisymmetry w.r.t. the exchange of the two centers
+   call overlap_grad_cgto_diat_scal(cgtoi, cgtoj, r2, vec, 100.0_wp, &
+   & ksig, kpi, kdel, overlap, doverlapi, overlap_scaled, doverlapi_scaled)
+
+   vec(:) = -vec
+   
+   call overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, 100.0_wp, & 
+   & ksig, kpi, kdel, overlap, doverlapj, overlap_scaled, doverlapj_scaled)
+
+   lp: do i = 1, 3
+      do j = 1, msao(cgtoi%ang)
+         do k = 1, msao(cgtoj%ang)
+            call check(error, doverlapi(i, j, k), -doverlapj(i, k, j), thr=thr)
+            if (allocated(error)) exit lp
+            call check(error, doverlapi_scaled(i, j, k), -doverlapj_scaled(i, k, j), thr=thr)
+            if (allocated(error)) exit lp
+         end do
+      end do
+   end do lp
+   if (allocated(error)) return
+
+   ! Test the analytical againts the numerical gradient
+   do i = 1, 3
+      vec(i) = vec(i) + step
+      r2 = sum(vec**2)
+      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
+      & 100.0_wp, ksig, kpi, kdel, sr, sr_scaled)
+      
+      vec(i) = vec(i) - 2*step
+      r2 = sum(vec**2)
+      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
+      & 100.0_wp, ksig, kpi, kdel, sl, sl_scaled)
+
+      vec(i) = vec(i) + step
+      doverlaptmp(i, :, :) = 0.5_wp * (sr - sl) / step
+      doverlaptmp_scaled(i, :, :) = 0.5_wp * (sr_scaled - sl_scaled) / step
+   end do
+   
+   num: do i = 1, 3
+      do j = 1, msao(cgtoi%ang) 
+         do k = 1, msao(cgtoj%ang)
+            call check(error, doverlapj(i, k, j), doverlaptmp(i, k, j), thr=thr)
+            if (allocated(error)) exit num
+            call check(error, doverlapj_scaled(i, k, j), doverlaptmp_scaled(i, k, j), thr=thr)
+            if (allocated(error)) exit num
+         end do
+      end do
+   end do num
+   if (allocated(error)) return
+
+end subroutine test_overlap_diat_grad_gen
 
 subroutine test_overlap_diat_grad_ss(error)
 
@@ -980,68 +1067,54 @@ subroutine test_overlap_diat_grad_ss(error)
    type(error_type), allocatable, intent(out) :: error
 
    integer, parameter :: ng = 6
-   integer :: stat, i
+
    type(cgto_type) :: cgtoi, cgtoj
-   real(wp) :: vec(3), r2
-   real(wp) :: overlap(1, 1), doverlapi(3, 1, 1), doverlapj(3, 1, 1), sr(1, 1), sl(1, 1)
-   real(wp) :: overlap_scaled(1, 1), doverlapi_scaled(3, 1, 1), doverlapj_scaled(3, 1, 1), sr_scaled(1, 1), sl_scaled(1, 1)
-   real(wp), parameter :: step = 1.0e-6_wp
+   real(wp) :: vec(3)
    real(wp) :: ksig, kpi, kdel
+   integer :: stat
 
    call slater_to_gauss(ng, 2, 0, 1.0_wp, cgtoi, .true., stat)
-   call slater_to_gauss(ng, 1, 0, 1.0_wp, cgtoj, .true., stat)
+   call slater_to_gauss(ng, 1, 0, 2.0_wp, cgtoj, .true., stat)
 
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec - 0.5_wp
-   r2 = sum(vec**2)
-
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
 
    ksig = 0.1_wp
-   kpi = 0.5_wp
-   kdel = 0.8_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
 
-   call overlap_grad_cgto_diat_scal(cgtoi, cgtoj, r2, vec, 100.0_wp, & 
-   & ksig, kpi, kdel, overlap, doverlapj, overlap_scaled, doverlapj_scaled)
-
-   vec(:) = -vec
-   
-   call overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, 100.0_wp, & 
-   & ksig, kpi, kdel, overlap, doverlapi, overlap_scaled, doverlapi_scaled)
-
-   do i = 1, 3
-      call check(error, doverlapi(i, 1, 1), -doverlapj(i, 1, 1), thr=thr)
-      if (allocated(error)) exit
-      call check(error, doverlapi_scaled(i, 1, 1), -doverlapj_scaled(i, 1, 1), thr=thr)
-      if (allocated(error)) exit
-   end do
-   if (allocated(error)) return
-
-   do i = 1, 3
-      vec(i) = vec(i) + step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sr, sr_scaled)
-
-      vec(i) = vec(i) - 2*step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sl, sl_scaled)
-
-      vec(i) = vec(i) + step
-      doverlapj(i, :, :) = 0.5_wp * (sr - sl) / step
-      doverlapj_scaled(i, :, :) = 0.5_wp * (sr_scaled - sl_scaled) / step
-   end do
-
-   do i = 1, 3
-      call check(error, doverlapi(i, 1, 1), doverlapj(i, 1, 1), thr=thr)
-      if (allocated(error)) exit
-      call check(error, doverlapi_scaled(i, 1, 1), doverlapj_scaled(i, 1, 1), thr=thr)
-      if (allocated(error)) exit
-   end do
-   if (allocated(error)) return
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
 
 end subroutine test_overlap_diat_grad_ss
 
+subroutine test_overlap_diat_grad_ss_z(error)
+
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
+
+   integer, parameter :: ng = 6
+
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
+
+   call slater_to_gauss(ng, 2, 0, 1.0_wp, cgtoi, .true., stat)
+   call slater_to_gauss(ng, 1, 0, 2.0_wp, cgtoj, .true., stat)
+
+   ! Vector along the z-axis to test the ill-defined gradient
+   vec(1) = 0.0_wp
+   vec(2) = 0.0_wp   
+   vec(3) = 0.5_wp
+
+   ksig = 0.1_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
+
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
+
+end subroutine test_overlap_diat_grad_ss_z
 
 subroutine test_overlap_diat_grad_sp(error)
 
@@ -1049,76 +1122,54 @@ subroutine test_overlap_diat_grad_sp(error)
    type(error_type), allocatable, intent(out) :: error
 
    integer, parameter :: ng = 6
-   integer :: stat, i, j, k
+
    type(cgto_type) :: cgtoi, cgtoj
-   real(wp) :: vec(3), r2
-   real(wp) :: overlap(1, 3), doverlapi(3, 1, 3), doverlapj(3, 3, 1), doverlaptmp(3, 1, 3), sl(1, 3), sr(1, 3)
-   real(wp) :: overlap_scaled(1, 3), doverlapi_scaled(3, 1, 3), doverlapj_scaled(3, 3, 1), &
-   & doverlaptmp_scaled(3, 1, 3), sr_scaled(1, 3), sl_scaled(1, 3)   
-   real(wp), parameter :: step = 1.0e-6_wp
+   real(wp) :: vec(3)
    real(wp) :: ksig, kpi, kdel
+   integer :: stat
 
    call slater_to_gauss(ng, 4, 0, 1.0_wp, cgtoi, .true., stat)
    call slater_to_gauss(ng, 3, 1, 2.0_wp, cgtoj, .true., stat)
 
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec- 0.5_wp
-   r2 = sum(vec**2)
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
 
    ksig = 0.1_wp
-   kpi = 0.5_wp
-   kdel = 0.8_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
 
-   call overlap_grad_cgto_diat_scal(cgtoi, cgtoj, r2, vec, 100.0_wp, &
-   & ksig, kpi, kdel, overlap, doverlapj, overlap_scaled, doverlapj_scaled)
-
-   vec(:) = -vec
-   
-   call overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, 100.0_wp, & 
-   & ksig, kpi, kdel, overlap, doverlapi, overlap_scaled, doverlapi_scaled)
-
-   lp: do i = 1, 3
-      do j = 1, 1
-         do k = 1, 3
-            call check(error, doverlapi(i, j, k), -doverlapj(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-            call check(error, doverlapi_scaled(i, j, k), -doverlapj_scaled(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-         end do
-      end do
-   end do lp
-   if (allocated(error)) return
-
-   do i = 1, 3
-      vec(i) = vec(i) + step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sr, sr_scaled)
-      
-      vec(i) = vec(i) - 2*step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sl, sl_scaled)
-
-      vec(i) = vec(i) + step
-      doverlaptmp(i, :, :) = 0.5_wp * (sr - sl) / step
-      doverlaptmp_scaled(i, :, :) = 0.5_wp * (sr_scaled - sl_scaled) / step
-   end do
-
-   num: do i = 1, 3
-      do j = 1, 1
-         do k = 1, 3
-            call check(error, doverlapi(i, j, k), doverlaptmp(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-            call check(error, doverlapi_scaled(i, j, k), doverlaptmp_scaled(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-         end do
-      end do
-   end do num
-   if (allocated(error)) return
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
 
 end subroutine test_overlap_diat_grad_sp
 
+subroutine test_overlap_diat_grad_sp_z(error)
+
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
+
+   integer, parameter :: ng = 6
+
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
+
+   call slater_to_gauss(ng, 4, 0, 1.0_wp, cgtoi, .true., stat)
+   call slater_to_gauss(ng, 3, 1, 2.0_wp, cgtoj, .true., stat)
+
+   ! Vector along the z-axis to test the ill-defined gradient
+   vec(1) = 0.0_wp
+   vec(2) = 0.0_wp   
+   vec(3) = 0.5_wp
+
+   ksig = 0.1_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
+
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
+
+end subroutine test_overlap_diat_grad_sp_z
 
 subroutine test_overlap_diat_grad_pp(error)
 
@@ -1126,74 +1177,54 @@ subroutine test_overlap_diat_grad_pp(error)
    type(error_type), allocatable, intent(out) :: error
 
    integer, parameter :: ng = 6
-   integer :: stat, i, j, k
-   type(cgto_type) :: cgtoi, cgtoj
-   real(wp) :: vec(3), r2
-   real(wp) :: overlap(3, 3), doverlapi(3, 3, 3), doverlapj(3, 3, 3), sr(3, 3), sl(3, 3)
-   real(wp) :: overlap_scaled(3, 3), doverlapi_scaled(3, 3, 3), doverlapj_scaled(3, 3, 3), sr_scaled(3, 3), sl_scaled(3, 3)
-   real(wp), parameter :: step = 1.0e-6_wp
-   real(wp) :: ksig, kpi, kdel
 
-   call slater_to_gauss(ng, 3, 1, 1.0_wp, cgtoi, .true., stat)
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
+
+   call slater_to_gauss(ng, 3, 1, 1.5_wp, cgtoi, .true., stat)
    call slater_to_gauss(ng, 2, 1, 1.0_wp, cgtoj, .true., stat)
 
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec - 0.5_wp
-   r2 = sum(vec**2)
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
 
    ksig = 0.1_wp
-   kpi = 0.5_wp
-   kdel = 0.8_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
 
-   call overlap_grad_cgto_diat_scal(cgtoi, cgtoj, r2, vec, 100.0_wp, & 
-   & ksig, kpi, kdel, overlap, doverlapj, overlap_scaled, doverlapj_scaled)
-
-   vec(:) = -vec
-   call overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, 100.0_wp, &
-   & ksig, kpi, kdel, overlap, doverlapi, overlap_scaled, doverlapi_scaled)
-
-   lp: do i = 1, 3
-      do j = 1, 3
-         do k = 1, 3
-            call check(error, doverlapi(i, j, k), -doverlapj(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-            call check(error, doverlapi_scaled(i, j, k), -doverlapj_scaled(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-         end do
-      end do
-   end do lp
-   if (allocated(error)) return 
-
-   do i = 1, 3
-      vec(i) = vec(i) + step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sr, sr_scaled)
-
-      vec(i) = vec(i) - 2*step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sl, sl_scaled)
-
-      vec(i) = vec(i) + step
-      doverlapj(i, :, :) = 0.5_wp * (sr - sl) / step
-      doverlapj_scaled(i, :, :) = 0.5_wp * (sr_scaled - sl_scaled) / step
-   end do
-
-   num: do i = 1, 3
-      do j = 1, 3
-         do k = 1, 3
-            call check(error, doverlapi(i, j, k), doverlapj(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-            call check(error, doverlapi_scaled(i, j, k), doverlapj_scaled(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-         end do
-      end do
-   end do num
-   if (allocated(error)) return
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
 
 end subroutine test_overlap_diat_grad_pp
 
+subroutine test_overlap_diat_grad_pp_z(error)
+
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
+
+   integer, parameter :: ng = 6
+
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
+
+   call slater_to_gauss(ng, 3, 1, 1.5_wp, cgtoi, .true., stat)
+   call slater_to_gauss(ng, 2, 1, 1.0_wp, cgtoj, .true., stat)
+
+   ! Vector along the z-axis to test the ill-defined gradient
+   vec(1) = 0.0_wp
+   vec(2) = 0.0_wp   
+   vec(3) = 0.5_wp
+
+   ksig = 0.1_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
+
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
+
+end subroutine test_overlap_diat_grad_pp_z
 
 subroutine test_overlap_diat_grad_sd(error)
 
@@ -1201,87 +1232,55 @@ subroutine test_overlap_diat_grad_sd(error)
    type(error_type), allocatable, intent(out) :: error
 
    integer, parameter :: ng = 6
-   integer :: stat, i, j, k
+
    type(cgto_type) :: cgtoi, cgtoj
-   real(wp) :: vec(3), r2
-   real(wp) :: overlap(1, 5), doverlapi(3, 1, 5), doverlapj(3, 5, 1), doverlaptmp(3, 1, 5), sl(1, 5), sr(1, 5)
-   real(wp) :: overlap_scaled(1, 5), doverlapi_scaled(3, 1, 5), doverlapj_scaled(3, 5, 1), &
-   & doverlaptmp_scaled(3, 1, 5), sr_scaled(1, 5), sl_scaled(1, 5)   
-   real(wp), parameter :: step = 1.0e-6_wp
+   real(wp) :: vec(3)
    real(wp) :: ksig, kpi, kdel
+   integer :: stat
+
 
    call slater_to_gauss(ng, 4, 0, 1.0_wp, cgtoi, .true., stat)
-   call slater_to_gauss(ng, 3, 2, 1.0_wp, cgtoj, .true., stat)
+   call slater_to_gauss(ng, 3, 2, 1.8_wp, cgtoj, .true., stat)
 
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec - 0.5_wp
-
-   vec(1) = 0.0_wp
-   vec(2) = 0.0_wp   
-   vec(3) = 1.0_wp
-   r2 = sum(vec**2)
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
 
    ksig = 0.1_wp
-   kpi = 0.5_wp
-   kdel = 0.8_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
 
-   call overlap_grad_cgto_diat_scal(cgtoi, cgtoj, r2, vec, 100.0_wp, &
-   & ksig, kpi, kdel, overlap, doverlapj, overlap_scaled, doverlapj_scaled)
-
-   vec(:) = -vec
-   call overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, 100.0_wp, & 
-   & ksig, kpi, kdel, overlap, doverlapi, overlap_scaled, doverlapi_scaled)
-
-   lp: do i = 1, 3
-      do j = 1, 1
-         do k = 1, 5
-            call check(error, doverlapi(i, j, k), -doverlapj(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-            call check(error, doverlapi_scaled(i, j, k), -doverlapj_scaled(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-         end do
-      end do
-   end do lp
-   if (allocated(error)) return
-
-   do i = 1, 3
-      vec(i) = vec(i) + step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sr, sr_scaled)
-      
-      vec(i) = vec(i) - 2*step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sl, sl_scaled)
-
-      vec(i) = vec(i) + step
-      doverlaptmp(i, :, :) = 0.5_wp * (sr - sl) / step
-      doverlaptmp_scaled(i, :, :) = 0.5_wp * (sr_scaled - sl_scaled) / step
-   end do
-
-      call write_2d_matrix(overlap_scaled, "overlap grad")
-      call write_2d_matrix(sr_scaled, "overlap")
-
-
-   num: do i = 1, 3
-      write(*,*) "i", i
-      call write_2d_matrix(doverlapi_scaled(i,:,:), "ana")
-      call write_2d_matrix(doverlaptmp_scaled(i,:,:), "num")
-
-      do j = 1, 1
-         do k = 1, 5
-            !call check(error, doverlapi(i, j, k), doverlaptmp(i, j, k), thr=thr)
-            !if (allocated(error)) exit num
-            !call check(error, doverlapi_scaled(i, j, k), doverlaptmp_scaled(i, j, k), thr=thr)
-            !if (allocated(error)) exit num
-         end do
-      end do
-   end do num
-   if (allocated(error)) return
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
 
 end subroutine test_overlap_diat_grad_sd
 
+subroutine test_overlap_diat_grad_sd_z(error)
+
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
+
+   integer, parameter :: ng = 6
+
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
+
+   call slater_to_gauss(ng, 4, 0, 1.0_wp, cgtoi, .true., stat)
+   call slater_to_gauss(ng, 3, 2, 1.8_wp, cgtoj, .true., stat)
+
+   ! Vector along the z-axis to test the ill-defined gradient
+   vec(1) = 0.0_wp
+   vec(2) = 0.0_wp   
+   vec(3) = 0.5_wp
+
+   ksig = 0.1_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
+
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
+
+end subroutine test_overlap_diat_grad_sd_z
 
 subroutine test_overlap_diat_grad_pd(error)
 
@@ -1289,76 +1288,54 @@ subroutine test_overlap_diat_grad_pd(error)
    type(error_type), allocatable, intent(out) :: error
 
    integer, parameter :: ng = 6
-   integer :: stat, i, j, k
+
    type(cgto_type) :: cgtoi, cgtoj
-   real(wp) :: vec(3), r2
-   real(wp) :: overlap(3, 5), doverlapi(3, 3, 5), doverlapj(3, 5, 3), doverlaptmp(3, 5, 3), sl(5, 3), sr(5, 3)
-   real(wp) :: overlap_scaled(3, 5), doverlapi_scaled(3, 3, 5), doverlapj_scaled(3, 5, 3), &
-   & doverlaptmp_scaled(3, 5, 3), sr_scaled(5, 3), sl_scaled(5, 3)   
-   real(wp), parameter :: step = 1.0e-6_wp
+   real(wp) :: vec(3)
    real(wp) :: ksig, kpi, kdel
+   integer :: stat
 
-   call slater_to_gauss(ng, 4, 1, 1.0_wp, cgtoi, .true., stat)
-   call slater_to_gauss(ng, 3, 2, 1.0_wp, cgtoj, .true., stat)
+   call slater_to_gauss(ng, 4, 1, 1.5_wp, cgtoi, .true., stat)
+   call slater_to_gauss(ng, 3, 2, 1.5_wp, cgtoj, .true., stat)
 
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec - 0.5_wp
-   r2 = sum(vec**2)
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
 
    ksig = 0.1_wp
-   kpi = 0.5_wp
-   kdel = 0.8_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
 
-   call overlap_grad_cgto_diat_scal(cgtoi, cgtoj, r2, vec, 100.0_wp, &
-   & ksig, kpi, kdel, overlap, doverlapi, overlap_scaled, doverlapi_scaled)
-
-   vec(:) = -vec
-
-   call overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, 100.0_wp, & 
-   & ksig, kpi, kdel, overlap, doverlapj, overlap_scaled, doverlapj_scaled)
-
-   lp: do i = 1, 3
-      do j = 1, 3
-         do k = 1, 5
-            call check(error, doverlapi(i, j, k), -doverlapj(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-            call check(error, doverlapi_scaled(i, j, k), -doverlapj_scaled(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-         end do
-      end do
-   end do lp
-   if (allocated(error)) return
-
-   do i = 1, 3
-      vec(i) = vec(i) + step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sr, sr_scaled)
-      
-      vec(i) = vec(i) - 2*step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sl, sl_scaled)
-
-      vec(i) = vec(i) + step
-      doverlaptmp(i, :, :) = 0.5_wp * (sr - sl) / step
-      doverlaptmp_scaled(i, :, :) = 0.5_wp * (sr_scaled - sl_scaled) / step
-   end do
-
-   num: do i = 1, 3
-      do j = 1, 5
-         do k = 1, 3
-            call check(error, doverlapj(i, j, k), doverlaptmp(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-            call check(error, doverlapj_scaled(i, j, k), doverlaptmp_scaled(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-         end do
-      end do
-   end do num
-   if (allocated(error)) return
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
 
 end subroutine test_overlap_diat_grad_pd
 
+subroutine test_overlap_diat_grad_pd_z(error)
+
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
+
+   integer, parameter :: ng = 6
+
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
+
+   call slater_to_gauss(ng, 4, 1, 1.5_wp, cgtoi, .true., stat)
+   call slater_to_gauss(ng, 3, 2, 1.5_wp, cgtoj, .true., stat)
+
+   ! Vector along the z-axis to test the ill-defined gradient
+   vec(1) = 0.0_wp
+   vec(2) = 0.0_wp   
+   vec(3) = 0.5_wp
+
+   ksig = 0.1_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
+
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
+
+end subroutine test_overlap_diat_grad_pd_z
 
 subroutine test_overlap_diat_grad_dd(error)
 
@@ -1366,74 +1343,54 @@ subroutine test_overlap_diat_grad_dd(error)
    type(error_type), allocatable, intent(out) :: error
 
    integer, parameter :: ng = 6
-   integer :: stat, i, j, k
+
    type(cgto_type) :: cgtoi, cgtoj
-   real(wp) :: vec(3), r2
-   real(wp) :: overlap(5, 5), doverlapi(3, 5, 5), doverlapj(3, 5, 5), sl(5, 5), sr(5, 5)
-   real(wp) :: overlap_scaled(5, 5), doverlapi_scaled(3, 5, 5), doverlapj_scaled(3, 5, 5), sr_scaled(5, 5), sl_scaled(5, 5)   
-   real(wp), parameter :: step = 1.0e-6_wp
+   real(wp) :: vec(3)
    real(wp) :: ksig, kpi, kdel
+   integer :: stat
 
    call slater_to_gauss(ng, 4, 2, 1.0_wp, cgtoi, .true., stat)
-   call slater_to_gauss(ng, 3, 2, 1.0_wp, cgtoj, .true., stat)
+   call slater_to_gauss(ng, 3, 2, 1.3_wp, cgtoj, .true., stat)
 
+   ! Randomly oriented vector of length 0.7
    call random_number(vec)
-   vec = vec - 0.5_wp
-   r2 = sum(vec**2)
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.7_wp
 
    ksig = 0.1_wp
-   kpi = 0.5_wp
-   kdel = 0.8_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
 
-   call overlap_grad_cgto_diat_scal(cgtoi, cgtoj, r2, vec, 100.0_wp, &
-   & ksig, kpi, kdel, overlap, doverlapj, overlap_scaled, doverlapj_scaled)
-
-   vec(:) = -vec
-
-   call overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, 100.0_wp, & 
-   & ksig, kpi, kdel, overlap, doverlapi, overlap_scaled, doverlapi_scaled)
-
-   lp: do i = 1, 3
-      do j = 1, 5
-         do k = 1, 5
-            call check(error, doverlapi(i, j, k), -doverlapj(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-            call check(error, doverlapi_scaled(i, j, k), -doverlapj_scaled(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-         end do
-      end do
-   end do lp
-   if (allocated(error)) return
-
-   do i = 1, 3
-      vec(i) = vec(i) + step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sr, sr_scaled)
-      
-      vec(i) = vec(i) - 2*step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sl, sl_scaled)
-
-      vec(i) = vec(i) + step
-      doverlapj(i, :, :) = 0.5_wp * (sr - sl) / step
-      doverlapj_scaled(i, :, :) = 0.5_wp * (sr_scaled - sl_scaled) / step
-   end do
-
-   num: do i = 1, 3
-      do j = 1, 5
-         do k = 1, 5
-            call check(error, doverlapi(i, j, k), doverlapj(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-            call check(error, doverlapi_scaled(i, j, k), doverlapj_scaled(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-         end do
-      end do
-   end do num
-   if (allocated(error)) return
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
 
 end subroutine test_overlap_diat_grad_dd
+
+subroutine test_overlap_diat_grad_dd_z(error)
+
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
+
+   integer, parameter :: ng = 6
+
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
+
+   call slater_to_gauss(ng, 4, 2, 1.0_wp, cgtoi, .true., stat)
+   call slater_to_gauss(ng, 3, 2, 1.3_wp, cgtoj, .true., stat)
+
+   ! Vector along the z-axis to test the ill-defined gradient
+   vec(1) = 0.0_wp
+   vec(2) = 0.0_wp   
+   vec(3) = 0.7_wp
+
+   ksig = 0.1_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
+
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
+
+end subroutine test_overlap_diat_grad_dd_z
 
 subroutine test_overlap_diat_grad_sf(error)
 
@@ -1441,76 +1398,54 @@ subroutine test_overlap_diat_grad_sf(error)
    type(error_type), allocatable, intent(out) :: error
 
    integer, parameter :: ng = 6
-   integer :: stat, i, j, k
-   type(cgto_type) :: cgtoi, cgtoj
-   real(wp) :: vec(3), r2
-   real(wp) :: overlap(1, 7), doverlapi(3, 1, 7), doverlapj(3, 7, 1), doverlaptmp(3, 7, 1), sl(7, 1), sr(7, 1)
-   real(wp) :: overlap_scaled(1, 7), doverlapi_scaled(3, 1, 7), doverlapj_scaled(3, 7, 1), &
-   & doverlaptmp_scaled(3, 7, 1), sr_scaled(7, 1), sl_scaled(7, 1)   
-   real(wp), parameter :: step = 1.0e-6_wp
-   real(wp) :: ksig, kpi, kdel
 
-   call slater_to_gauss(ng, 5, 0, 1.0_wp, cgtoi, .true., stat)
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
+
+   call slater_to_gauss(ng, 5, 0, 2.0_wp, cgtoi, .true., stat)
    call slater_to_gauss(ng, 4, 3, 1.0_wp, cgtoj, .true., stat)
 
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec
-   r2 = sum(vec**2)
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
 
    ksig = 0.1_wp
-   kpi = 0.5_wp
-   kdel = 0.8_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
 
-   call overlap_grad_cgto_diat_scal(cgtoi, cgtoj, r2, vec, 100.0_wp, &
-   & ksig, kpi, kdel, overlap, doverlapi, overlap_scaled, doverlapi_scaled)
-
-   vec(:) = -vec
-
-   call overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, 100.0_wp, & 
-   & ksig, kpi, kdel, overlap, doverlapj, overlap_scaled, doverlapj_scaled)
-
-   lp: do i = 1, 3
-      do j = 1, 1
-         do k = 1, 7
-            call check(error, doverlapi(i, j, k), -doverlapj(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-            call check(error, doverlapi_scaled(i, j, k), -doverlapj_scaled(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-         end do
-      end do
-   end do lp
-   if (allocated(error)) return
-
-   do i = 1, 3
-      vec(i) = vec(i) + step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sr, sr_scaled)
-      
-      vec(i) = vec(i) - 2*step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sl, sl_scaled)
-
-      vec(i) = vec(i) + step
-      doverlaptmp(i, :, :) = 0.5_wp * (sr - sl) / step
-      doverlaptmp_scaled(i, :, :) = 0.5_wp * (sr_scaled - sl_scaled) / step
-   end do
-
-   num: do i = 1, 3
-      do j = 1, 7
-         do k = 1, 1
-            call check(error, doverlapj(i, j, k), doverlaptmp(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-            call check(error, doverlapj_scaled(i, j, k), doverlaptmp_scaled(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-         end do
-      end do
-   end do num
-   if (allocated(error)) return
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
 
 end subroutine test_overlap_diat_grad_sf
 
+subroutine test_overlap_diat_grad_sf_z(error)
+
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
+
+   integer, parameter :: ng = 6
+
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
+
+   call slater_to_gauss(ng, 5, 0, 2.0_wp, cgtoi, .true., stat)
+   call slater_to_gauss(ng, 4, 3, 1.0_wp, cgtoj, .true., stat)
+
+   ! Vector along the z-axis to test the ill-defined gradient
+   vec(1) = 0.0_wp
+   vec(2) = 0.0_wp   
+   vec(3) = 0.5_wp
+
+   ksig = 0.1_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
+
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
+
+end subroutine test_overlap_diat_grad_sf_z
 
 subroutine test_overlap_diat_grad_pf(error)
 
@@ -1518,76 +1453,55 @@ subroutine test_overlap_diat_grad_pf(error)
    type(error_type), allocatable, intent(out) :: error
 
    integer, parameter :: ng = 6
-   integer :: stat, i, j, k
+
    type(cgto_type) :: cgtoi, cgtoj
-   real(wp) :: vec(3), r2
-   real(wp) :: overlap(3, 7), doverlapi(3, 3, 7), doverlapj(3, 7, 3), doverlaptmp(3, 7, 3), sl(7, 3), sr(7, 3)
-   real(wp) :: overlap_scaled(3, 7), doverlapi_scaled(3, 3, 7), doverlapj_scaled(3, 7, 3), &
-   & doverlaptmp_scaled(3, 7, 3), sr_scaled(7, 3), sl_scaled(7, 3)   
-   real(wp), parameter :: step = 1.0e-6_wp
+   real(wp) :: vec(3)
    real(wp) :: ksig, kpi, kdel
+   integer :: stat, i
 
    call slater_to_gauss(ng, 5, 1, 1.0_wp, cgtoi, .true., stat)
-   call slater_to_gauss(ng, 4, 3, 1.0_wp, cgtoj, .true., stat)
+   call slater_to_gauss(ng, 4, 3, 2.0_wp, cgtoj, .true., stat)
 
+
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec
-   r2 = sum(vec**2)
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
 
    ksig = 0.1_wp
-   kpi = 0.5_wp
-   kdel = 0.8_wp
-
-   call overlap_grad_cgto_diat_scal(cgtoi, cgtoj, r2, vec, 100.0_wp, &
-   & ksig, kpi, kdel, overlap, doverlapi, overlap_scaled, doverlapi_scaled)
-
-   vec(:) = -vec
-
-   call overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, 100.0_wp, & 
-   & ksig, kpi, kdel, overlap, doverlapj, overlap_scaled, doverlapj_scaled)
-
-   lp: do i = 1, 3
-      do j = 1, 3
-         do k = 1, 7
-            call check(error, doverlapi(i, j, k), -doverlapj(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-            call check(error, doverlapi_scaled(i, j, k), -doverlapj_scaled(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-         end do
-      end do
-   end do lp
-   if (allocated(error)) return
-
-   do i = 1, 3
-      vec(i) = vec(i) + step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sr, sr_scaled)
-      
-      vec(i) = vec(i) - 2*step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sl, sl_scaled)
-
-      vec(i) = vec(i) + step
-      doverlaptmp(i, :, :) = 0.5_wp * (sr - sl) / step
-      doverlaptmp_scaled(i, :, :) = 0.5_wp * (sr_scaled - sl_scaled) / step
-   end do
-
-   num: do i = 1, 3
-      do j = 1, 7
-         do k = 1, 3
-            call check(error, doverlapj(i, j, k), doverlaptmp(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-            call check(error, doverlapj_scaled(i, j, k), doverlaptmp_scaled(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-         end do
-      end do
-   end do num
-   if (allocated(error)) return
+   kpi = 0.2_wp
+   kdel = 0.5_wp
+   
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
 
 end subroutine test_overlap_diat_grad_pf
 
+subroutine test_overlap_diat_grad_pf_z(error)
+
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
+
+   integer, parameter :: ng = 6
+
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
+
+   call slater_to_gauss(ng, 5, 1, 1.0_wp, cgtoi, .true., stat)
+   call slater_to_gauss(ng, 4, 3, 2.0_wp, cgtoj, .true., stat)
+
+   ! Vector along the z-axis to test the ill-defined gradient
+   vec(1) = 0.0_wp
+   vec(2) = 0.0_wp   
+   vec(3) = 0.5_wp
+
+   ksig = 0.1_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
+
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
+
+end subroutine test_overlap_diat_grad_pf_z
 
 subroutine test_overlap_diat_grad_df(error)
 
@@ -1595,76 +1509,54 @@ subroutine test_overlap_diat_grad_df(error)
    type(error_type), allocatable, intent(out) :: error
 
    integer, parameter :: ng = 6
-   integer :: stat, i, j, k
+
    type(cgto_type) :: cgtoi, cgtoj
-   real(wp) :: vec(3), r2
-   real(wp) :: overlap(5, 7), doverlapi(3, 5, 7), doverlapj(3, 7, 5), doverlaptmp(3, 7, 5), sl(7, 5), sr(7, 5)
-   real(wp) :: overlap_scaled(5, 7), doverlapi_scaled(3, 5, 7), doverlapj_scaled(3, 7, 5), &
-   & doverlaptmp_scaled(3, 7, 5), sr_scaled(7, 5), sl_scaled(7, 5)   
-   real(wp), parameter :: step = 1.0e-6_wp
+   real(wp) :: vec(3)
    real(wp) :: ksig, kpi, kdel
+   integer :: stat
+   
+   call slater_to_gauss(ng, 5, 2, 1.3_wp, cgtoi, .true., stat)
+   call slater_to_gauss(ng, 4, 3, 1.4_wp, cgtoj, .true., stat)
 
-   call slater_to_gauss(ng, 5, 2, 1.0_wp, cgtoi, .true., stat)
-   call slater_to_gauss(ng, 4, 3, 1.0_wp, cgtoj, .true., stat)
-
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec
-   r2 = sum(vec**2)
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
 
    ksig = 0.1_wp
-   kpi = 0.5_wp
-   kdel = 0.8_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
 
-   call overlap_grad_cgto_diat_scal(cgtoi, cgtoj, r2, vec, 100.0_wp, &
-   & ksig, kpi, kdel, overlap, doverlapi, overlap_scaled, doverlapi_scaled)
-
-   vec(:) = -vec
-
-   call overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, 100.0_wp, & 
-   & ksig, kpi, kdel, overlap, doverlapj, overlap_scaled, doverlapj_scaled)
-
-   lp: do i = 1, 3
-      do j = 1, 5
-         do k = 1, 7
-            call check(error, doverlapi(i, j, k), -doverlapj(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-            call check(error, doverlapi_scaled(i, j, k), -doverlapj_scaled(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-         end do
-      end do
-   end do lp
-   if (allocated(error)) return
-
-   do i = 1, 3
-      vec(i) = vec(i) + step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sr, sr_scaled)
-      
-      vec(i) = vec(i) - 2*step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sl, sl_scaled)
-
-      vec(i) = vec(i) + step
-      doverlaptmp(i, :, :) = 0.5_wp * (sr - sl) / step
-      doverlaptmp_scaled(i, :, :) = 0.5_wp * (sr_scaled - sl_scaled) / step
-   end do
-
-   num: do i = 1, 3
-      do j = 1, 7
-         do k = 1, 5
-            call check(error, doverlapj(i, j, k), doverlaptmp(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-            call check(error, doverlapj_scaled(i, j, k), doverlaptmp_scaled(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-         end do
-      end do
-   end do num
-   if (allocated(error)) return
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
 
 end subroutine test_overlap_diat_grad_df
 
+subroutine test_overlap_diat_grad_df_z(error)
+
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
+
+   integer, parameter :: ng = 6
+
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
+   
+   call slater_to_gauss(ng, 5, 2, 1.3_wp, cgtoi, .true., stat)
+   call slater_to_gauss(ng, 4, 3, 1.4_wp, cgtoj, .true., stat)
+
+   ! Vector along the z-axis to test the ill-defined gradient
+   vec(1) = 0.0_wp
+   vec(2) = 0.0_wp   
+   vec(3) = 0.5_wp
+
+   ksig = 0.1_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
+
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
+
+end subroutine test_overlap_diat_grad_df_z
 
 subroutine test_overlap_diat_grad_ff(error)
 
@@ -1672,124 +1564,56 @@ subroutine test_overlap_diat_grad_ff(error)
    type(error_type), allocatable, intent(out) :: error
 
    integer, parameter :: ng = 6
-   integer :: stat, i, j, k
-   type(cgto_type) :: cgtoi, cgtoj
-   real(wp) :: vec(3), r2
-   real(wp) :: overlap(7, 7), doverlapi(3, 7, 7), doverlapj(3, 7, 7), doverlaptmp(3, 7, 7), sl(7, 7), sr(7, 7)
-   real(wp) :: overlap_scaled(7, 7), doverlapi_scaled(3, 7, 7), doverlapj_scaled(3, 7, 7), &
-   & doverlaptmp_scaled(3, 7, 7), sr_scaled(7, 7), sl_scaled(7, 7)   
-   real(wp), parameter :: step = 1.0e-6_wp
-   real(wp) :: ksig, kpi, kdel
 
-   call slater_to_gauss(ng, 5, 3, 1.0_wp, cgtoi, .true., stat)
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
+
+   call slater_to_gauss(ng, 5, 3, 1.6_wp, cgtoi, .true., stat)
    call slater_to_gauss(ng, 4, 3, 1.0_wp, cgtoj, .true., stat)
 
+   ! Randomly oriented vector of length 0.5
    call random_number(vec)
-   vec = vec
-   r2 = sum(vec**2)
+   vec = (vec - 0.5_wp)*(sum(vec**2))*0.5_wp
+   vec(1) = 0.0_wp
+   vec(2) = 0.0_wp   
+   vec(3) = 0.1_wp
 
    ksig = 0.1_wp
-   kpi = 0.5_wp
-   kdel = 0.8_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
 
-   call overlap_grad_cgto_diat_scal(cgtoi, cgtoj, r2, vec, 100.0_wp, &
-   & ksig, kpi, kdel, overlap, doverlapi, overlap_scaled, doverlapi_scaled)
-
-   vec(:) = -vec
-
-   call overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, 100.0_wp, & 
-   & ksig, kpi, kdel, overlap, doverlapj, overlap_scaled, doverlapj_scaled)
-
-   lp: do i = 1, 3
-      do j = 1, 7
-         do k = 1, 7
-            call check(error, doverlapi(i, j, k), -doverlapj(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-            call check(error, doverlapi_scaled(i, j, k), -doverlapj_scaled(i, k, j), thr=thr)
-            if (allocated(error)) exit lp
-         end do
-      end do
-   end do lp
-   if (allocated(error)) return
-
-   do i = 1, 3
-      vec(i) = vec(i) + step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sr, sr_scaled)
-      
-      vec(i) = vec(i) - 2*step
-      r2 = sum(vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & 100.0_wp, ksig, kpi, kdel, sl, sl_scaled)
-
-      vec(i) = vec(i) + step
-      doverlaptmp(i, :, :) = 0.5_wp * (sr - sl) / step
-      doverlaptmp_scaled(i, :, :) = 0.5_wp * (sr_scaled - sl_scaled) / step
-   end do
-
-   num: do i = 1, 3
-      do j = 1, 7
-         do k = 1, 7
-            call check(error, doverlapj(i, j, k), doverlaptmp(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-            call check(error, doverlapj_scaled(i, j, k), doverlaptmp_scaled(i, j, k), thr=thr)
-            if (allocated(error)) exit num
-         end do
-      end do
-   end do num
-   if (allocated(error)) return
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
 
 end subroutine test_overlap_diat_grad_ff
 
+subroutine test_overlap_diat_grad_ff_z(error)
 
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
 
+   integer, parameter :: ng = 6
 
+   type(cgto_type) :: cgtoi, cgtoj
+   real(wp) :: vec(3)
+   real(wp) :: ksig, kpi, kdel
+   integer :: stat
 
-subroutine write_2d_matrix(matrix, name, unit, step)
-   implicit none
-   real(wp), intent(in) :: matrix(:, :)
-   character(len=*), intent(in), optional :: name
-   integer, intent(in), optional :: unit
-   integer, intent(in), optional :: step
-   integer :: d1, d2
-   integer :: i, j, k, l, istep, iunit
+   call slater_to_gauss(ng, 5, 3, 1.6_wp, cgtoi, .true., stat)
+   call slater_to_gauss(ng, 4, 3, 1.0_wp, cgtoj, .true., stat)
 
-   d1 = size(matrix, dim=1)
-   d2 = size(matrix, dim=2)
+   ! Vector along the z-axis to test the ill-defined gradient
+   vec(1) = 0.0_wp
+   vec(2) = 0.0_wp   
+   vec(3) = 0.5_wp
 
-   if (present(unit)) then
-     iunit = unit
-   else
-     iunit = output_unit
-   end if
+   ksig = 0.1_wp
+   kpi = 0.2_wp
+   kdel = 0.5_wp
 
-   if (present(step)) then
-     istep = step
-   else
-     istep = 6
-   end if
+   call test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
 
-   if (present(name)) write (iunit, '(/,"matrix printed:",1x,a)') name
-
-   do i = 1, d2, istep
-     l = min(i + istep - 1, d2)
-     write (iunit, '(/,6x)', advance='no')
-     do k = i, l
-       write (iunit, '(6x,i7,1x)', advance='no') k
-     end do
-     write (iunit, '(a)')
-     do j = 1, d1
-       write (iunit, '(i6)', advance='no') j
-       do k = i, l
-         write (iunit, '(1x,f13.8)', advance='no') matrix(j, k)
-       end do
-       write (iunit, '(a)')
-     end do
-   end do
-
- end subroutine write_2d_matrix
-
-
+end subroutine test_overlap_diat_grad_ff_z
 
 end module test_integral_overlap

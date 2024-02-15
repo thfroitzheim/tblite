@@ -17,8 +17,6 @@
 !> @file tblite/integral/diat_trafo.f90
 !> Evaluation of the diatomic scaled overlap
 module tblite_integral_diat_trafo
-   use iso_fortran_env, only: output_unit
-
 
    use mctc_env, only : wp
    use tblite_blas, only: gemm
@@ -34,8 +32,7 @@ module tblite_integral_diat_trafo
 contains
 
    !> Transformation to the diatomic frame and back: 
-   !pure 
-   subroutine diat_trafo(block_overlap, vec, ksig, kpi, kdel, maxl)
+   pure subroutine diat_trafo(block_overlap, vec, ksig, kpi, kdel, maxl)
       !> Diatomic block of CGTOs to be transformed (+ scaled)
       real(wp),intent(inout)    :: block_overlap(:,:)
       !> Transformation vector for the diatomic frame (i.e. vector between the two centers)
@@ -51,14 +48,12 @@ contains
 
       trafo_dim = ndim(maxl+1)
 
-      ! Allocate arrays in the needed size
       allocate(transformed_s(trafo_dim,trafo_dim), tmp(trafo_dim,trafo_dim), source=0.0_wp)
 
       ! 1. Setup the transformation matrix
       call harmtr(maxl, vec, trafomat)
 
-      ! 2. Transform the overlap submatrix to the diatomic frame
-      ! trans_block_s = O^T * S * O
+      ! 2. Transform the overlap submatrix to the diatomic frame: S' = O^T * S * O
       if (maxl > 0) then
          call gemm(amat=trafomat,bmat=block_overlap,cmat=tmp,transa='T',transb='N')
          call gemm(amat=tmp,bmat=trafomat,cmat=transformed_s,transa='N',transb='N')
@@ -68,22 +63,21 @@ contains
 
       ! 3. Scale elements in the diatomic frame
       call scale_diatomic_frame(transformed_s, ksig, kpi, kdel, maxl) 
-      
+
+      ! 4. Transform the overlap submatrix back to original frame: Ssc = O * Ssc' * O^T
       block_overlap = 0.0_wp
-      ! 4. Transform the overlap submatrix back to original frame
-      ! block_overlap = O * S * O^T
       if (maxl > 0) then
          call gemm(amat=trafomat,bmat=transformed_s,cmat=tmp,transa='N',transb='N')
          call gemm(amat=tmp,bmat=trafomat,cmat=block_overlap,transa='N',transb='T')
       else
          block_overlap(1,1) = transformed_s(1,1)
       endif
+
    end subroutine diat_trafo
 
 
-   !> Gradient of Transformation to the diatomic frame and back: 
-   !pure 
-   subroutine diat_trafo_grad(block_overlap, block_doverlap, vec, ksig, kpi, kdel, maxl)
+   !> Gradient of the diatomic frame scaled overlap transformation: 
+   pure subroutine diat_trafo_grad(block_overlap, block_doverlap, vec, ksig, kpi, kdel, maxl)
       !> Diatomic block of CGTO overlap to be transformed (+ scaled)
       real(wp),intent(inout)    :: block_overlap(:,:)
       !> Derivative of diatomic block of CGTO overlap to be transformed (+ scaled)
@@ -96,7 +90,7 @@ contains
       integer,intent(in)        :: maxl
       
       integer :: ic, trafo_dim
-      real(wp) :: trafomat(ndim(maxl+1),ndim(maxl+1)), dtrafomat(3,ndim(maxl+1),ndim(maxl+1))
+      real(wp) :: trafomat(3,ndim(maxl+1),ndim(maxl+1)), dtrafomat(3,ndim(maxl+1),ndim(maxl+1))
       real(wp), allocatable :: eff_tra_mat(:,:), eff_dtra_mat(:,:,:)
       real(wp), allocatable :: eff_block_overlap(:,:), eff_block_doverlap(:,:,:)
       real(wp), allocatable :: tmp(:,:), tmp2(:,:), interm_oso(:,:), &
@@ -107,33 +101,30 @@ contains
       trafomat = 0.0_wp
       dtrafomat = 0.0_wp
 
-      ! Allocate arrays in the needed size
       allocate(interm_oso(trafo_dim,trafo_dim), interm_doso(3,trafo_dim,trafo_dim), &
       & interm_osdo(3,trafo_dim,trafo_dim), interm_odso(3,trafo_dim,trafo_dim), &
       & tmp(trafo_dim,trafo_dim), tmp2(trafo_dim,trafo_dim), source=0.0_wp)
 
-      ! 1. Setup the transformation matrix and its derivative
+      ! 1. Setup the transformation matrix and its derivative for all directions.
+      ! For the case vec || z-axis, the x- and y-derivatives are ill-defined 
+      ! and have to be evaluated assuming either x or y orientation. 
       call d_harmtr(maxl, vec, trafomat, dtrafomat)
 
-      ! call write_2d_matrix(dtrafomat(2,:,:), "dtrafomat", step=9)
-      ! call write_2d_matrix(trafomat, "trafomat", step=9)
-
-      ! 2. Transform the overlap submatrix to the diatomic frame
-      ! interm_s = matmul(matmul(transpose(trafomat), block_overlap),trafomat)
+      ! 2. Transform the overlap submatrix to the diatomic frame: S' = O^T * S * O
       if (maxl > 0) then
          ! interm_oso = O^T * S * O
-         call gemm(amat=trafomat,bmat=block_overlap,cmat=tmp,transa='T',transb='N')
-         call gemm(amat=tmp,bmat=trafomat,cmat=interm_oso,transa='N',transb='N')
+         call gemm(amat=trafomat(3,:,:),bmat=block_overlap,cmat=tmp,transa='T',transb='N')
+         call gemm(amat=tmp,bmat=trafomat(3,:,:),cmat=interm_oso,transa='N',transb='N')
          do ic = 1, 3
             ! interm_doso = dO^T * S * O
             call gemm(amat=dtrafomat(ic,:,:),bmat=block_overlap,cmat=tmp,transa='T',transb='N')
-            call gemm(amat=tmp,bmat=trafomat,cmat=interm_doso(ic,:,:),transa='N',transb='N')
+            call gemm(amat=tmp,bmat=trafomat(ic,:,:),cmat=interm_doso(ic,:,:),transa='N',transb='N')
             ! interm_osdo = O^T * S * dO
-            call gemm(amat=trafomat,bmat=block_overlap,cmat=tmp,transa='T',transb='N')
+            call gemm(amat=trafomat(ic,:,:),bmat=block_overlap,cmat=tmp,transa='T',transb='N')
             call gemm(amat=tmp,bmat=dtrafomat(ic,:,:),cmat=interm_osdo(ic,:,:),transa='N',transb='N')
             ! interm_odso = O^T * dS * O
-            call gemm(amat=trafomat,bmat=block_doverlap(ic,:,:),cmat=tmp,transa='T',transb='N')
-            call gemm(amat=tmp,bmat=trafomat,cmat=interm_odso(ic,:,:),transa='N',transb='N')
+            call gemm(amat=trafomat(ic,:,:),bmat=block_doverlap(ic,:,:),cmat=tmp,transa='T',transb='N')
+            call gemm(amat=tmp,bmat=trafomat(ic,:,:),cmat=interm_odso(ic,:,:),transa='N',transb='N')
          end do
       else
          interm_oso(1,1) = block_overlap(1,1)
@@ -145,36 +136,36 @@ contains
       ! 3. Scale overlap and each dimension of the derivative in the diatomic frame
       call scale_diatomic_frame(interm_oso, ksig, kpi, kdel, maxl) 
       do ic = 1, 3
-         write(*,*) "ic", ic
          call scale_diatomic_frame(interm_doso(ic,:,:), ksig, kpi, kdel, maxl)
          call scale_diatomic_frame(interm_osdo(ic,:,:), ksig, kpi, kdel, maxl) 
          call scale_diatomic_frame(interm_odso(ic,:,:), ksig, kpi, kdel, maxl) 
       end do
 
-      ! 4. Transform diatomic frame quantities (S', (dOSO)', and (OdSO)') back to original frame
+      ! 4. Transform diatomic frame quantities (S', (dOSO)', (OSdO)' and (OdSO)') back to original frame
       if (maxl > 0) then
          ! block_overlap = O * S' * O^T
-         call gemm(amat=trafomat,bmat=interm_oso,cmat=tmp,transa='N',transb='N')
-         call gemm(amat=tmp,bmat=trafomat,cmat=block_overlap,transa='N',transb='T')
+         call gemm(amat=trafomat(3,:,:),bmat=interm_oso,cmat=tmp,transa='N',transb='N')
+         call gemm(amat=tmp,bmat=trafomat(3,:,:),cmat=block_overlap,transa='N',transb='T')
 
          do ic = 1, 3
             ! block_doverlap = dO * S' * O^T + O * S' * dO^T
             call gemm(amat=dtrafomat(ic,:,:),bmat=interm_oso,cmat=tmp,transa='N',transb='N')
-            call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
+            call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat(ic,:,:),cmat=block_doverlap(ic,:,:),transa='N',transb='T')
 
-            call gemm(amat=trafomat,bmat=interm_oso,cmat=tmp,transa='N',transb='N')
+            call gemm(amat=trafomat(ic,:,:),bmat=interm_oso,cmat=tmp,transa='N',transb='N')
             call gemm(alpha=1.0_wp,amat=tmp,bmat=dtrafomat(ic,:,:),beta=1.0_wp,&
             &cmat=block_doverlap(ic,:,:),transa='N',transb='T')
             
-            ! block_doverlap += O * dS' * O^T 
-            call gemm(amat=trafomat,bmat=interm_doso(ic,:,:),cmat=tmp,transa='N',transb='N')
-            call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat,beta=1.0_wp,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
+            ! block_doverlap += O * (dOSO)' * O^T + O * (OSdO)' * O^T 
+            call gemm(amat=trafomat(ic,:,:),bmat=interm_doso(ic,:,:),cmat=tmp,transa='N',transb='N')
+            call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat(ic,:,:),beta=1.0_wp,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
 
-            call gemm(amat=trafomat,bmat=interm_odso(ic,:,:),cmat=tmp,transa='N',transb='N')
-            call gemm(amat=tmp,bmat=trafomat,beta=1.0_wp,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
+            call gemm(amat=trafomat(ic,:,:),bmat=interm_odso(ic,:,:),cmat=tmp,transa='N',transb='N')
+            call gemm(amat=tmp,bmat=trafomat(ic,:,:),beta=1.0_wp,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
             
-            call gemm(amat=trafomat,bmat=interm_osdo(ic,:,:),cmat=tmp,transa='N',transb='N')
-            call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat,beta=1.0_wp,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
+            ! block_doverlap += O * (OdSO)' * O^T 
+            call gemm(amat=trafomat(ic,:,:),bmat=interm_osdo(ic,:,:),cmat=tmp,transa='N',transb='N')
+            call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat(ic,:,:),beta=1.0_wp,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
          end do
       else
          block_overlap(1,1) = interm_oso(1,1)
@@ -183,14 +174,6 @@ contains
 
    end subroutine diat_trafo_grad
 
-
-   logical pure function eff_equality(num1, num2)
-      !> Numbers to compare
-      real(wp), intent(in) :: num1, num2
-      
-      ! Logical deciding if numbers are (almost) equal or not
-      eff_equality = (abs( num1 - num2 ) .le. 1.0e-12_wp)
-   end function eff_equality
 
    pure subroutine harmtr(maxl,vec,trafomat)
       !> Maximum angular momentum
@@ -204,13 +187,15 @@ contains
       real(wp) :: norm_vec(3)
 
       trafomat = 0.0_wp
+
       ! -----------------------------
       ! *** s functions (trafomat(1x1)) ***
       ! -----------------------------
+      
       trafomat(1,1) = 1.0
 
       if ( maxl == 0 ) return
-      
+
       ! Normalize the vector
       len = sqrt(sum(vec**2))
       norm_vec = vec / len
@@ -218,6 +203,8 @@ contains
       ! Prepare spherical coordinats
       cost = norm_vec(3)
       if ( abs(cost) .eq. 1.0_wp ) then
+         ! Here, phi is arbitrary as the vector is parallel to the z-axis.
+         ! We choose the x-axis as the arbitrary direction.
          sint = 0.0_wp
          cosp = 1.0_wp
          sinp = 0.0_wp
@@ -226,7 +213,6 @@ contains
          cosp = norm_vec(1)
          sinp = norm_vec(2)
       else
-         !sint = SQRT(1.0_wp-COST**2)
          sint = SQRT(norm_vec(1)**2 + norm_vec(2)**2)
          cosp = norm_vec(1)/SINT
          sinp = norm_vec(2)/SINT
@@ -236,17 +222,11 @@ contains
       ! *** p functions (trafomat(4x4)) ***
       ! -----------------------------
 
-      ! tblite ordering with adapted column ordering
+      ! Adapted to tblite ordering from MSINDO
       ! 1st index:
-      ! MSINDO defintion of p function ordering is converted to
-      ! tblite definition of p function ordering. E.g. for first entry:
-      ! trafomat(2,:)_MSINDO -> trafomat(px,:) -> trafomat(4:)_tblite
-      ! 2nd index:
-      ! Final ordering of p functions (see below) corresponds to the
-      ! tblite ordering of p functions. For the second index, the ordering
-      ! 3, 4, 2 holds, corresponding (in MSINDO convention)
-      ! to the tblite ordering of p functions, i.e.
-      ! y, z, x
+      ! (2,:)_MSINDO -> (px,:) -> (4,:)_tblite
+      ! (3,:)_MSINDO -> (py,:) -> (2,:)_tblite
+      ! (4,:)_MSINDO -> (pz,:) -> (3,:)_tblite
       trafomat(4,3) = SINT*COSP
       trafomat(2,3) = SINT*SINP
       trafomat(3,3) = COST
@@ -269,9 +249,8 @@ contains
       SIN2P = 2.0_wp * SINP*COSP
       SQRT3 = SQRT(3.0_wp)
 
-      ! Original MSINDO ordering
-      ! The MSINDO d SAO ordering corresponds to the
-      ! tblite ordering of d SAOs
+      ! Original MSINDO ordering of d-functions 
+      ! is the same as in tblite
       trafomat(5,5) = (3.0_wp * COST**2 - 1.0_wp) * 0.5_wp
       trafomat(6,5) = SQRT3*SIN2T*COSP*0.5_wp
       trafomat(7,5) = SQRT3*SIN2T*SINP*0.5_wp
@@ -334,176 +313,135 @@ contains
 
    end subroutine harmtr
 
-   !pure 
-   subroutine d_harmtr(maxl,vec,trafomat, dtrafomat)
+   pure subroutine d_harmtr(maxl,vec,trafomat, dtrafomat)
       !> Maximum angular momentum
       integer, intent(in)  :: maxl
       !> Normalized vector from atom k to atom l
       real(wp), intent(in) :: vec(3)
       !> Transformation matrix
-      real(wp), intent(out) :: trafomat(ndim(maxl+1),ndim(maxl+1))
-      !> Transformation matrix
+      real(wp), intent(out) :: trafomat(3,ndim(maxl+1),ndim(maxl+1))
+      !> Derivative of transformation matrix
       real(wp), intent(out) :: dtrafomat(3,ndim(maxl+1),ndim(maxl+1))
       
       real(wp), parameter              :: eps = 1.0e-08_wp
 
-      !> Derivative of transformation matrix w.r.t. theta
+      !> Derivative of transformation matrix w.r.t. theta (x- or z-direction)
       real(wp) :: trafomat_dt(ndim(maxl+1),ndim(maxl+1))
-      !> Derivative of transformation matrix w.r.t. phi
+      !> Derivative of transformation matrix w.r.t. theta (y-direction)
+      real(wp) :: trafomat_dty(ndim(maxl+1),ndim(maxl+1))
+      !> Derivative of transformation matrix w.r.t. phi (x- or z-direction)
       real(wp) :: trafomat_dp(ndim(maxl+1),ndim(maxl+1))
+      !> Derivative of transformation matrix w.r.t. phi (y-direction)
+      real(wp) :: trafomat_dpy(ndim(maxl+1),ndim(maxl+1))
 
       integer :: i,j
 
-      real(wp) :: cos2p, cos2t, cosp, cost, sin2p, sin2t, sinp, sint, sqrt3, len
-      real(wp) :: dcos2t, dsin2t, dcos2p, dsin2p, dpdx, dpdy, dpdz, dtdx, dtdy, dtdz
-      real(wp) :: norm_vec(3), sq
+      ! Intermediate variables for the trigonometric functions
+      ! Separte version for y for the case: vec || z-axis
+      real(wp) :: cos2p, cos2t, cosp, cost, sin2p, sin2t, sinp
+      real(wp) :: cos2py, cos2ty, cospy, costy, sin2py, sin2ty, sinpy
+      real(wp) :: dcos2t, dsin2t, dcos2p, dsin2p
+      real(wp) :: dcos2ty, dsin2ty, dcos2py, dsin2py
+      real(wp) :: dpdx, dpdy, dpdz, dtdx, dtdy, dtdz
+      real(wp) :: norm_vec(3), sq, sint, sqrt3, len
 
       trafomat = 0.0_wp
       trafomat_dt = 0.0_wp
+      trafomat_dty = 0.0_wp
       trafomat_dp = 0.0_wp
+      trafomat_dpy = 0.0_wp
 
       ! -----------------------------
       ! *** s functions (trafomat(1x1)) ***
       ! -----------------------------
-      trafomat(1,1) = 1.0
-      dtrafomat(1, 1, 1) = 0.0_wp
+
+      trafomat(:,1,1) = 1.0_wp
+      dtrafomat(:,1,1) = 0.0_wp
 
       if ( maxl == 0 ) return
 
       ! Normalize the vector
       len = sqrt(sum(vec**2))
       norm_vec = vec / len
-
-      if ( abs(1.0_wp-abs(norm_vec(1))) .lt. eps ) then
-         norm_vec(1) = sign(1.0_wp,norm_vec(1))
-         norm_vec(2) = 0.0_wp
-         norm_vec(3) = 0.0_wp
-      else if ( abs(1.0_wp-abs(norm_vec(2))) .lt. eps ) then
-         norm_vec(1) = 0.0_wp
-         norm_vec(2) = sign(1.0_wp,norm_vec(2))
-         norm_vec(3) = 0.0_wp
-      else if ( abs(1.0_wp-abs(norm_vec(3))) .lt. eps ) then
-         norm_vec(1) = 0.0_wp
-         norm_vec(2) = 0.0_wp
-         norm_vec(3) = sign(1.0_wp,norm_vec(3))
-      else if ( (abs(norm_vec(1)) .lt. eps) .and. .not. eff_equality(norm_vec(1),0.0_wp) ) then
-         norm_vec(1) = 0.0_wp
-         sq = sqrt( norm_vec(2)**2 + norm_vec(3)**2 )
-         norm_vec(2) = norm_vec(2)/sq
-         norm_vec(3) = norm_vec(3)/sq
-      else if ( (abs(norm_vec(2)) .lt. eps) .and. .not. eff_equality(norm_vec(2),0.0_wp) ) then
-         norm_vec(2) = 0.0_wp
-         sq = sqrt( norm_vec(1)**2 + norm_vec(3)**2 )
-         norm_vec(1) = norm_vec(1)/sq
-         norm_vec(3) = norm_vec(3)/sq
-      else if ( (abs(norm_vec(3)) .lt. eps) .and. .not. eff_equality(norm_vec(3),0.0_wp) ) then
-         norm_vec(3) = 0.0_wp
-         sq = sqrt(norm_vec(1)**2 + norm_vec(2)**2)
-         norm_vec(1) = norm_vec(1)/sq
-         norm_vec(2) = norm_vec(2)/sq
-      endif
-
-      
       ! Prepare spherical coordinats
       cost = norm_vec(3)
       if ( abs(cost) .eq. 1.0_wp ) then
          sint = 0.0_wp
+         ! Here, phi is arbitrary as the vector is parallel to the z-axis.
+         ! In turn, the derivative is ill defined and has to be evaluated
+         ! assuming either x or y orientation for the infinitesimal change. 
+         ! This is only require for the p- and d-functions, which are transformed.
          cosp = 1.0_wp
          sinp = 0.0_wp
+         if ( maxl == 1 .or. maxl == 2 ) then 
+            cospy = 0.0_wp
+            sinpy = -1.0_wp
+         else
+            cospy = cosp
+            sinpy = sinp
+         end if
       else if ( abs(cost) .eq. 0.0_wp ) then
          sint = 1.0_wp
          cosp = norm_vec(1)
          sinp = norm_vec(2)
+         cospy = cosp
+         sinpy = sinp
       else
          sint = SQRT(norm_vec(1)**2 + norm_vec(2)**2)
          cosp = norm_vec(1)/SINT
          sinp = norm_vec(2)/SINT
+         cospy = cosp
+         sinpy = sinp
       endif
 
       ! Prepare sperical coordinate derivative
+      ! In the case of vec || z-axis, the phi derivative vanishes.
       if(norm_vec(1)**2 + norm_vec(2)**2 .lt. eps) then
-         write(*,*) "in if"
-         dpdx = -1.0_wp
-         dpdy = 1.0_wp
-         dtdx = 0.0_wp
-         dtdy = 0.0_wp
+         dpdx = 0.0_wp
+         dpdy = 0.0_wp
       else
-         write(*,*) "in else"
-
-         dpdx = -vec(2) / (vec(1)**2 + vec(2)**2) 
-         dpdy = vec(1) / (vec(1)**2 + vec(2)**2)
-         dtdx = vec(1)*vec(3) / (SQRT(vec(1)**2 + vec(2)**2)*len**2)
-         dtdy = vec(2)*vec(3) / (SQRT(vec(1)**2 + vec(2)**2)*len**2)
-      end if 
-      dpdz = 0.0_wp
-      dtdz = -SQRT(vec(1)**2+vec(2)**2) / len**2
-
-      write(*,*) "first"
-      write(*,*) "dpdx", dpdx
-      write(*,*) "dpdy", dpdy
-      write(*,*) "dpdz", dpdz
-      write(*,*) "dtdx", dtdx
-      write(*,*) "dtdy", dtdy
-      write(*,*) "dtdz", dtdz
-
-
-
-      ! Prepare sperical coordinate derivative
-      if(norm_vec(1)**2 + norm_vec(2)**2 .lt. eps) then
-         write(*,*) "in if"
-         dpdx = -1.0_wp
-         dpdy = 1.0_wp
-      else
-         write(*,*) "in else"
-
          dpdx = -sinp / sqrt(vec(1)**2 + vec(2)**2) 
-         dpdy = cosp / sqrt(vec(1)**2 + vec(2)**2)
-
+         dpdy = cospy / sqrt(vec(1)**2 + vec(2)**2)
       end if 
-      ! dpdx = -sinp / sqrt(vec(1)**2 + vec(2)**2) 
-      ! dpdy = cosp / sqrt(vec(1)**2 + vec(2)**2)
       dpdz = 0.0_wp
-
       dtdx = cost * cosp / len
-      dtdy = cost * sinp / len
+      dtdy = cost * sinpy / len
       dtdz = -sint / len
 
-      write(*,*) "second"
-      write(*,*) "dpdx", dpdx
-      write(*,*) "dpdy", dpdy
-      write(*,*) "dpdz", dpdz
-      write(*,*) "dtdx", dtdx
-      write(*,*) "dtdy", dtdy
-      write(*,*) "dtdz", dtdz
-
-      ! write(*,*) "derives phi, theta", dpdx, dpdy, dtdx, dtdy
-      
       ! -----------------------------
       ! *** p functions (trafomat(4x4)) ***
       ! -----------------------------
 
-      ! tblite ordering with adapted column ordering
+      ! Adapted to tblite ordering from MSINDO
       ! 1st index:
-      ! MSINDO defintion of p function ordering is converted to
-      ! tblite definition of p function ordering. E.g. for first entry:
-      ! trafomat(2,:)_MSINDO -> trafomat(px,:) -> trafomat(4:)_tblite
-      ! 2nd index:
-      ! Final ordering of p functions (see below) corresponds to the
-      ! tblite ordering of p functions. For the second index, the ordering
-      ! 3, 4, 2 holds, corresponding (in MSINDO convention)
-      ! to the tblite ordering of p functions, i.e.
-      ! y, z, x
-      trafomat(4,3) = SINT*COSP
-      trafomat(2,3) = SINT*SINP
-      trafomat(3,3) = COST
-      trafomat(4,4) = COST*COSP
-      trafomat(2,4) = COST*SINP
-      trafomat(3,4) = -SINT
-      trafomat(4,2) = -SINP
-      trafomat(2,2) = COSP
-      trafomat(3,2) = 0.0_wp
+      ! (2,:)_MSINDO -> (px,:) -> (4,:)_tblite
+      ! (3,:)_MSINDO -> (py,:) -> (2,:)_tblite
+      ! (4,:)_MSINDO -> (pz,:) -> (3,:)_tblite
 
-      ! derivative w.r.t. theta
+      ! x-direction
+      trafomat(1,4,3) = SINT*COSP
+      trafomat(1,2,3) = SINT*SINP
+      trafomat(1,3,3) = COST
+      trafomat(1,4,4) = COST*COSP
+      trafomat(1,2,4) = COST*SINP
+      trafomat(1,3,4) = -SINT
+      trafomat(1,4,2) = -SINP
+      trafomat(1,2,2) = COSP
+      trafomat(1,3,2) = 0.0_wp
+      ! y-direction
+      trafomat(2,4,3) = SINT*COSPY
+      trafomat(2,2,3) = SINT*SINPY
+      trafomat(2,3,3) = COST
+      trafomat(2,4,4) = COST*COSPY
+      trafomat(2,2,4) = COST*SINPY
+      trafomat(2,3,4) = -SINT
+      trafomat(2,4,2) = -SINPY
+      trafomat(2,2,2) = COSPY
+      trafomat(2,3,2) = 0.0_wp
+      ! z-direction equal to x-direction
+      trafomat(3,:,:) = trafomat(1,:,:)
+
+      ! derivative w.r.t. theta (x- or z-direction)
       trafomat_dt(4,3) = COST*COSP
       trafomat_dt(2,3) = COST*SINP
       trafomat_dt(3,3) = -SINT
@@ -513,8 +451,18 @@ contains
       trafomat_dt(4,2) = 0.0_wp
       trafomat_dt(2,2) = 0.0_wp
       trafomat_dt(3,2) = 0.0_wp
+      ! y-direction
+      trafomat_dty(4,3) = COST*COSPY
+      trafomat_dty(2,3) = COST*SINPY
+      trafomat_dty(3,3) = -SINT
+      trafomat_dty(4,4) = -SINT*COSPY
+      trafomat_dty(2,4) = -SINT*SINPY
+      trafomat_dty(3,4) = -COST
+      trafomat_dty(4,2) = 0.0_wp
+      trafomat_dty(2,2) = 0.0_wp
+      trafomat_dty(3,2) = 0.0_wp
 
-      ! derivative w.r.t. phi
+      ! derivative w.r.t. phi (x- or z-direction)
       trafomat_dp(4,3) = -SINT*SINP
       trafomat_dp(2,3) = SINT*COSP
       trafomat_dp(3,3) = 0.0_wp
@@ -524,11 +472,22 @@ contains
       trafomat_dp(4,2) = -COSP
       trafomat_dp(2,2) = -SINP
       trafomat_dp(3,2) = 0.0_wp
- 
+      ! y-direction
+      trafomat_dpy(4,3) = -SINT*SINPY
+      trafomat_dpy(2,3) = SINT*COSPY
+      trafomat_dpy(3,3) = 0.0_wp
+      trafomat_dpy(4,4) = -COST*SINPY
+      trafomat_dpy(2,4) = COST*COSPY
+      trafomat_dpy(3,4) = 0.0_wp
+      trafomat_dpy(4,2) = -COSPY
+      trafomat_dpy(2,2) = -SINPY
+      trafomat_dpy(3,2) = 0.0_wp
+           
+
       if ( maxl <= 1 ) then 
          dtrafomat(1, 1:4, 1:4) = dpdx * trafomat_dp(1:4, 1:4) + dtdx * trafomat_dt(1:4, 1:4) 
-         dtrafomat(2, 1:4, 1:4) = dpdy * trafomat_dp(1:4, 1:4) + dtdy * trafomat_dt(1:4, 1:4) 
-         dtrafomat(3, 1:4, 1:4) = dpdz * trafomat_dp(1:4, 1:4) + dtdz * trafomat_dt(1:4, 1:4) 
+         dtrafomat(2, 1:4, 1:4) = dpdy * trafomat_dpy(1:4, 1:4) + dtdy * trafomat_dty(1:4, 1:4) 
+         dtrafomat(3, 1:4, 1:4) = dtdz * trafomat_dt(1:4, 1:4)
          return
       end if
 
@@ -536,47 +495,80 @@ contains
       ! *** d functions (trafomat(9x9)) ***
       ! -----------------------------
 
+      SQRT3 = SQRT(3.0_wp)
       COS2T = COST**2 - SINT**2
       SIN2T = 2.0_wp * SINT*COST
       COS2P = COSP**2 - SINP**2
       SIN2P = 2.0_wp * SINP*COSP
-      SQRT3 = SQRT(3.0_wp)
-
+      COS2PY = COSPY**2 - SINPY**2
+      SIN2PY = 2.0_wp * SINPY*COSPY
+      
       DCOS2T = -2.0_wp * SIN2T
       DSIN2T =  2.0_wp * COS2T
       DCOS2P = -2.0_wp * SIN2P
       DSIN2P =  2.0_wp * COS2P
+      DCOS2PY = -2.0_wp * SIN2PY
+      DSIN2PY =  2.0_wp * COS2PY
 
       ! Original MSINDO ordering
       ! The MSINDO d SAO ordering corresponds to the
       ! tblite ordering of d SAOs
-      trafomat(5,5) = (3.0_wp * COST**2 - 1.0_wp) * 0.5_wp
-      trafomat(6,5) = SQRT3*SIN2T*COSP*0.5_wp
-      trafomat(7,5) = SQRT3*SIN2T*SINP*0.5_wp
-      trafomat(8,5) = SQRT3*SINT**2*COS2P*0.5_wp
-      trafomat(9,5) = SQRT3*SINT**2*SIN2P*0.5_wp
-      trafomat(5,6) = -SQRT3*SIN2T*0.5_wp
-      trafomat(6,6) = COS2T*COSP
-      trafomat(7,6) = COS2T*SINP
-      trafomat(8,6) = SIN2T*COS2P*0.5_wp
-      trafomat(9,6) = SIN2T*SIN2P*0.5_wp
-      trafomat(5,7) = 0.0_wp
-      trafomat(6,7) = -COST*SINP
-      trafomat(7,7) = COST*COSP
-      trafomat(8,7) = -SINT*SIN2P
-      trafomat(9,7) = SINT*COS2P
-      trafomat(5,8) = SQRT3*SINT**2 * 0.5_wp
-      trafomat(6,8) = -SIN2T*COSP*0.5_wp
-      trafomat(7,8) = -SIN2T*SINP*0.5_wp
-      trafomat(8,8) = (1.0_wp + COST**2) * COS2P * 0.5_wp
-      trafomat(9,8) = (1.0_wp + COST**2) * SIN2P * 0.5_wp
-      trafomat(5,9) = 0.0_wp
-      trafomat(6,9) = SINT*SINP
-      trafomat(7,9) = -SINT*COSP
-      trafomat(8,9) = -COST*SIN2P
-      trafomat(9,9) = COST*COS2P
+      ! x-direction
+      trafomat(1,5,5) = (3.0_wp * COST**2 - 1.0_wp) * 0.5_wp
+      trafomat(1,6,5) = SQRT3*SIN2T*COSP*0.5_wp
+      trafomat(1,7,5) = SQRT3*SIN2T*SINP*0.5_wp
+      trafomat(1,8,5) = SQRT3*SINT**2*COS2P*0.5_wp
+      trafomat(1,9,5) = SQRT3*SINT**2*SIN2P*0.5_wp
+      trafomat(1,5,6) = -SQRT3*SIN2T*0.5_wp
+      trafomat(1,6,6) = COS2T*COSP
+      trafomat(1,7,6) = COS2T*SINP
+      trafomat(1,8,6) = SIN2T*COS2P*0.5_wp
+      trafomat(1,9,6) = SIN2T*SIN2P*0.5_wp
+      trafomat(1,5,7) = 0.0_wp
+      trafomat(1,6,7) = -COST*SINP
+      trafomat(1,7,7) = COST*COSP
+      trafomat(1,8,7) = -SINT*SIN2P
+      trafomat(1,9,7) = SINT*COS2P
+      trafomat(1,5,8) = SQRT3*SINT**2 * 0.5_wp
+      trafomat(1,6,8) = -SIN2T*COSP*0.5_wp
+      trafomat(1,7,8) = -SIN2T*SINP*0.5_wp
+      trafomat(1,8,8) = (1.0_wp + COST**2) * COS2P * 0.5_wp
+      trafomat(1,9,8) = (1.0_wp + COST**2) * SIN2P * 0.5_wp
+      trafomat(1,5,9) = 0.0_wp
+      trafomat(1,6,9) = SINT*SINP
+      trafomat(1,7,9) = -SINT*COSP
+      trafomat(1,8,9) = -COST*SIN2P
+      trafomat(1,9,9) = COST*COS2P
+      ! y-direction
+      trafomat(2,5,5) = (3.0_wp * COST**2 - 1.0_wp) * 0.5_wp
+      trafomat(2,6,5) = SQRT3*SIN2T*COSPY*0.5_wp
+      trafomat(2,7,5) = SQRT3*SIN2T*SINPY*0.5_wp
+      trafomat(2,8,5) = SQRT3*SINT**2*COS2PY*0.5_wp
+      trafomat(2,9,5) = SQRT3*SINT**2*SIN2PY*0.5_wp
+      trafomat(2,5,6) = -SQRT3*SIN2T*0.5_wp
+      trafomat(2,6,6) = COS2T*COSPY
+      trafomat(2,7,6) = COS2T*SINPY
+      trafomat(2,8,6) = SIN2T*COS2PY*0.5_wp
+      trafomat(2,9,6) = SIN2T*SIN2PY*0.5_wp
+      trafomat(2,5,7) = 0.0_wp
+      trafomat(2,6,7) = -COST*SINPY
+      trafomat(2,7,7) = COST*COSPY
+      trafomat(2,8,7) = -SINT*SIN2PY
+      trafomat(2,9,7) = SINT*COS2PY
+      trafomat(2,5,8) = SQRT3*SINT**2 * 0.5_wp
+      trafomat(2,6,8) = -SIN2T*COSPY*0.5_wp
+      trafomat(2,7,8) = -SIN2T*SINPY*0.5_wp
+      trafomat(2,8,8) = (1.0_wp + COST**2) * COS2PY * 0.5_wp
+      trafomat(2,9,8) = (1.0_wp + COST**2) * SIN2PY * 0.5_wp
+      trafomat(2,5,9) = 0.0_wp
+      trafomat(2,6,9) = SINT*SINPY
+      trafomat(2,7,9) = -SINT*COSPY
+      trafomat(2,8,9) = -COST*SIN2PY
+      trafomat(2,9,9) = COST*COS2PY
+      ! z-direction
+      trafomat(3,:,:) = trafomat(1,:,:)
       
-      ! derivative w.r.t. theta
+      ! derivative w.r.t. theta (x- or z-direction)
       trafomat_dt(5,5) = -3.0_wp*SIN2T*0.5_wp
       trafomat_dt(6,5) = SQRT3*DSIN2T*COSP*0.5_wp
       trafomat_dt(7,5) = SQRT3*DSIN2T*SINP*0.5_wp
@@ -602,8 +594,34 @@ contains
       trafomat_dt(7,9) = -COST*COSP
       trafomat_dt(8,9) = SINT*SIN2P
       trafomat_dt(9,9) = -SINT*COS2P
+      ! y-direction
+      trafomat_dty(5,5) = -3.0_wp*SIN2T*0.5_wp
+      trafomat_dty(6,5) = SQRT3*DSIN2T*COSPY*0.5_wp
+      trafomat_dty(7,5) = SQRT3*DSIN2T*SINPY*0.5_wp
+      trafomat_dty(8,5) = SQRT3*SIN2T*COS2PY*0.5_wp
+      trafomat_dty(9,5) = SQRT3*SIN2T*SIN2PY*0.5_wp
+      trafomat_dty(5,6) = -SQRT3*DSIN2T*0.5_wp
+      trafomat_dty(6,6) = DCOS2T*COSPY
+      trafomat_dty(7,6) = DCOS2T*SINPY
+      trafomat_dty(8,6) = DSIN2T*COS2PY*0.5_wp
+      trafomat_dty(9,6) = DSIN2T*SIN2PY*0.5_wp
+      trafomat_dty(5,7) = 0.0_wp
+      trafomat_dty(6,7) = SINT*SINPY
+      trafomat_dty(7,7) = -SINT*COSPY
+      trafomat_dty(8,7) = -COST*SIN2PY
+      trafomat_dty(9,7) = COST*COS2PY
+      trafomat_dty(5,8) = SQRT3*SIN2T*0.5_wp
+      trafomat_dty(6,8) = -DSIN2T*COSPY*0.5_wp
+      trafomat_dty(7,8) = -DSIN2T*SINPY*0.5_wp
+      trafomat_dty(8,8) = -SIN2T*COS2PY*0.5_wp
+      trafomat_dty(9,8) = -SIN2T*SIN2PY*0.5_wp
+      trafomat_dty(5,9) = 0.0_wp
+      trafomat_dty(6,9) = COST*SINPY
+      trafomat_dty(7,9) = -COST*COSPY
+      trafomat_dty(8,9) = SINT*SIN2PY
+      trafomat_dty(9,9) = -SINT*COS2PY
 
-      ! derivative w.r.t. phi
+      ! derivative w.r.t. phi (x- or z-direction)
       trafomat_dp(5,5) = 0.0_wp
       trafomat_dp(6,5) = -SQRT3*SIN2T*SINP*0.5_wp
       trafomat_dp(7,5) = SQRT3*SIN2T*COSP*0.5_wp
@@ -629,66 +647,90 @@ contains
       trafomat_dp(7,9) = SINT*SINP
       trafomat_dp(8,9) = -COST*DSIN2P
       trafomat_dp(9,9) = COST*DCOS2P
+      ! y-direction
+      trafomat_dpy(5,5) = 0.0_wp
+      trafomat_dpy(6,5) = -SQRT3*SIN2T*SINP*0.5_wp
+      trafomat_dpy(7,5) = SQRT3*SIN2T*COSP*0.5_wp
+      trafomat_dpy(8,5) = SQRT3*SINT**2*DCOS2P*0.5_wp
+      trafomat_dpy(9,5) = SQRT3*SINT**2*DSIN2P*0.5_wp
+      trafomat_dpy(5,6) = 0.0_wp
+      trafomat_dpy(6,6) = -COS2T*SINP
+      trafomat_dpy(7,6) = COS2T*COSP
+      trafomat_dpy(8,6) = SIN2T*DCOS2P*0.5_wp
+      trafomat_dpy(9,6) = SIN2T*DSIN2P*0.5_wp
+      trafomat_dpy(5,7) = 0.0_wp
+      trafomat_dpy(6,7) = -COST*COSP
+      trafomat_dpy(7,7) = -COST*SINP
+      trafomat_dpy(8,7) = -SINT*DSIN2P
+      trafomat_dpy(9,7) = SINT*DCOS2P
+      trafomat_dpy(5,8) = 0.0_wp
+      trafomat_dpy(6,8) = SIN2T*SINP*0.5_wp
+      trafomat_dpy(7,8) = -SIN2T*COSP*0.5_wp
+      trafomat_dpy(8,8) = (1.0+COST**2)*DCOS2P*0.5_wp
+      trafomat_dpy(9,8) = (1.0+COST**2)*DSIN2P*0.5_wp
+      trafomat_dpy(5,9) = 0.0_wp
+      trafomat_dpy(6,9) = SINT*COSP
+      trafomat_dpy(7,9) = SINT*SINP
+      trafomat_dpy(8,9) = -COST*DSIN2P
+      trafomat_dpy(9,9) = COST*DCOS2P
 
       if ( maxl <= 2 ) then 
          ! Transform to cartesian coordinates
          dtrafomat(1, 1:9, 1:9) = dpdx * trafomat_dp(1:9, 1:9) + dtdx * trafomat_dt(1:9, 1:9)
-         dtrafomat(2, 1:9, 1:9) = dpdy * trafomat_dp(1:9, 1:9) + dtdy * trafomat_dt(1:9, 1:9)
-         dtrafomat(3, 1:9, 1:9) = dpdz * trafomat_dp(1:9, 1:9) + dtdz * trafomat_dt(1:9, 1:9)
+         dtrafomat(2, 1:9, 1:9) = dpdy * trafomat_dpy(1:9, 1:9) + dtdy * trafomat_dty(1:9, 1:9)
+         dtrafomat(3, 1:9, 1:9) = dtdz * trafomat_dt(1:9, 1:9)
          return
       end if
-
 
       ! -----------------------------
       ! *** f functions (trafomat(16x16)) ***
       ! -----------------------------
 
       ! f-functions are not transformed to the diatomic frame!
-      ! Hence, the derivative remaints 0!
-      trafomat(10,10) = 1.0_wp
-      trafomat(11,11) = 1.0_wp
-      trafomat(12,12) = 1.0_wp
-      trafomat(13,13) = 1.0_wp
-      trafomat(14,14) = 1.0_wp
-      trafomat(15,15) = 1.0_wp
-      trafomat(16,16) = 1.0_wp
+      ! Hence, the derivative remains 0!
+      trafomat(:,10,10) = 1.0_wp
+      trafomat(:,11,11) = 1.0_wp
+      trafomat(:,12,12) = 1.0_wp
+      trafomat(:,13,13) = 1.0_wp
+      trafomat(:,14,14) = 1.0_wp
+      trafomat(:,15,15) = 1.0_wp
+      trafomat(:,16,16) = 1.0_wp
 
       if ( maxl <= 3 ) then 
          ! Transform to cartesian coordinates
          dtrafomat(1, 1:16, 1:16) = dpdx * trafomat_dp(1:16, 1:16) + dtdx * trafomat_dt(1:16, 1:16)
-         dtrafomat(2, 1:16, 1:16) = dpdy * trafomat_dp(1:16, 1:16) + dtdy * trafomat_dt(1:16, 1:16)
-         dtrafomat(3, 1:16, 1:16) = dpdz * trafomat_dp(1:16, 1:16) + dtdz * trafomat_dt(1:16, 1:16)
+         dtrafomat(2, 1:16, 1:16) = dpdy * trafomat_dpy(1:16, 1:16) + dtdy * trafomat_dty(1:16, 1:16)
+         dtrafomat(3, 1:16, 1:16) = dtdz * trafomat_dt(1:16, 1:16)
          return
       end if
-
 
       ! -----------------------------
       ! *** g functions (trafomat(25x25)) ***
       ! -----------------------------
 
       ! g-functions are not transformed to the diatomic frame!
-      trafomat(17,17) = 1.0_wp
-      trafomat(18,18) = 1.0_wp
-      trafomat(19,19) = 1.0_wp
-      trafomat(20,20) = 1.0_wp
-      trafomat(21,21) = 1.0_wp
-      trafomat(22,22) = 1.0_wp
-      trafomat(23,23) = 1.0_wp
-      trafomat(24,24) = 1.0_wp
-      trafomat(25,25) = 1.0_wp
+      ! Hence, the derivative remains 0!
+      trafomat(:,17,17) = 1.0_wp
+      trafomat(:,18,18) = 1.0_wp
+      trafomat(:,19,19) = 1.0_wp
+      trafomat(:,20,20) = 1.0_wp
+      trafomat(:,21,21) = 1.0_wp
+      trafomat(:,22,22) = 1.0_wp
+      trafomat(:,23,23) = 1.0_wp
+      trafomat(:,24,24) = 1.0_wp
+      trafomat(:,25,25) = 1.0_wp
 
       if ( maxl <= 4 ) then 
          ! Transform to cartesian coordinates
          dtrafomat(1, 1:25, 1:25) = dpdx * trafomat_dp(1:25, 1:25) + dtdx * trafomat_dt(1:25, 1:25)
-         dtrafomat(2, 1:25, 1:25) = dpdy * trafomat_dp(1:25, 1:25) + dtdy * trafomat_dt(1:25, 1:25)
-         dtrafomat(3, 1:25, 1:25) = dpdz * trafomat_dp(1:25, 1:25) + dtdz * trafomat_dt(1:25, 1:25)
+         dtrafomat(2, 1:25, 1:25) = dpdy * trafomat_dpy(1:25, 1:25) + dtdy * trafomat_dty(1:25, 1:25)
+         dtrafomat(3, 1:25, 1:25) = dtdz * trafomat_dt(1:25, 1:25)
          return
       end if
 
    end subroutine d_harmtr
 
-   !pure 
-   subroutine scale_diatomic_frame(diat_mat, ksig, kpi, kdel, maxl)
+   pure subroutine scale_diatomic_frame(diat_mat, ksig, kpi, kdel, maxl)
       !> Block matrix in the diatomic frame to be scaled
       real(wp),intent(inout)    :: diat_mat(:,:)
       !> Scaling parameters for different bonding contributions
@@ -696,39 +738,16 @@ contains
       !> Highest angular momentum between the two shells
       integer,intent(in)        :: maxl
 
-      ! call write_2d_matrix(diat_mat, "diat_mat", step=9)
-
-
-
       diat_mat(1,1) = diat_mat(1,1)*ksig ! Sigma bond s   <-> s
       if (maxl > 0) then
          diat_mat(1,3) = diat_mat(1,3)*ksig ! Sigma bond s   <-> pz
-         diat_mat(3,1) = diat_mat(3,1)*ksig ! Sigma bond pz  <-> s
-         
-         !Gradient
-         diat_mat(1,2) = diat_mat(1,2)*ksig ! Sigma bond s   <-> pz
-         diat_mat(2,1) = diat_mat(2,1)*ksig ! Sigma bond pz  <-> s
-         diat_mat(1,4) = diat_mat(1,4)*ksig ! Sigma bond s   <-> pz
-         diat_mat(4,1) = diat_mat(4,1)*ksig ! Sigma bond pz  <-> s
-
-
+         diat_mat(3,1) = diat_mat(3,1)*ksig ! Sigma bond pz  <-> s 
          diat_mat(3,3) = diat_mat(3,3)*ksig ! Sigma bond pz  <-> pz
          diat_mat(4,4) = diat_mat(4,4)*kpi  ! Pi    bond px  <-> px
          diat_mat(2,2) = diat_mat(2,2)*kpi  ! Pi    bond py  <-> py
          if (maxl > 1) then
             diat_mat(5,1) = diat_mat(5,1)*ksig ! Sigma bond dz2 <-> s
-            diat_mat(1,5) = diat_mat(1,5)*ksig ! Sigma bond s   <-> dz2
-
-            ! Gradient
-            diat_mat(6,1) = diat_mat(6,1)*ksig ! Sigma bond dz2 <-> s
-            diat_mat(1,6) = diat_mat(1,6)*ksig ! Sigma bond s   <-> dz2
-            diat_mat(7,1) = diat_mat(7,1)*ksig ! Sigma bond dz2 <-> s
-            diat_mat(1,7) = diat_mat(1,7)*ksig ! Sigma bond s   <-> dz2
-            diat_mat(8,1) = diat_mat(8,1)*ksig ! Sigma bond dz2 <-> s
-            diat_mat(1,8) = diat_mat(1,8)*ksig ! Sigma bond s   <-> dz2
-            diat_mat(9,1) = diat_mat(9,1)*ksig ! Sigma bond dz2 <-> s
-            diat_mat(1,9) = diat_mat(1,9)*ksig ! Sigma bond s   <-> dz2
-
+            diat_mat(1,5) = diat_mat(1,5)*ksig ! Sigma bond s   <-> dz2   
             diat_mat(3,5) = diat_mat(3,5)*ksig ! Sigma bond pz  <-> dz2
             diat_mat(5,3) = diat_mat(5,3)*ksig ! Sigma bond dz2 <-> pz
             diat_mat(5,5) = diat_mat(5,5)*ksig ! Sigma bond dz2 <-> dz2
@@ -744,73 +763,6 @@ contains
          ! f-functions remain unscaled
       endif
 
-      ! call write_2d_matrix(diat_mat, "diat_mat after", step=9)
    end subroutine scale_diatomic_frame
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-subroutine write_2d_matrix(matrix, name, unit, step)
-   implicit none
-   real(wp), intent(in) :: matrix(:, :)
-   character(len=*), intent(in), optional :: name
-   integer, intent(in), optional :: unit
-   integer, intent(in), optional :: step
-   integer :: d1, d2
-   integer :: i, j, k, l, istep, iunit
-
-   d1 = size(matrix, dim=1)
-   d2 = size(matrix, dim=2)
-
-   if (present(unit)) then
-     iunit = unit
-   else
-     iunit = output_unit
-   end if
-
-   if (present(step)) then
-     istep = step
-   else
-     istep = 6
-   end if
-
-   if (present(name)) write (iunit, '(/,"matrix printed:",1x,a)') name
-
-   do i = 1, d2, istep
-     l = min(i + istep - 1, d2)
-     write (iunit, '(/,6x)', advance='no')
-     do k = i, l
-       write (iunit, '(6x,i7,1x)', advance='no') k
-     end do
-     write (iunit, '(a)')
-     do j = 1, d1
-       write (iunit, '(i6)', advance='no') j
-       do k = i, l
-         write (iunit, '(1x,f13.8)', advance='no') matrix(j, k)
-       end do
-       write (iunit, '(a)')
-     end do
-   end do
-
- end subroutine write_2d_matrix
-
-
-
-
-
 
 end module tblite_integral_diat_trafo

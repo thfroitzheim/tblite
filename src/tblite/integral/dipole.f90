@@ -367,8 +367,7 @@ pure subroutine dipole_cgto(cgtoj, cgtoi, r2, vec, intcut, overlap, dpint)
 
 end subroutine dipole_cgto
 
-!pure
-subroutine dipole_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
+pure subroutine dipole_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
 & ksig, kpi, kdel, overlap, overlap_scaled, dpint)
    !> Description of contracted Gaussian function on center i
    type(cgto_type), intent(in) :: cgtoi
