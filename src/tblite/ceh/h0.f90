@@ -37,12 +37,8 @@ module tblite_ceh_h0
 
 contains
 
-
-!    !> Scale the selfenergy parameters by the CN
-!    subroutine get_scaled_selfenergy(h0, id, ish_at, nshell, cn, cn_en, selfenergy, dsedcn, dsedcn_en)
-
-   !> The gradient of the self energy is evaluated w.r.t. the positions R 
-   !> because two CN-dependencies exist
+   !> The gradient of the self energy is evaluated directly w.r.t. the positions R 
+   !> because two CN-dependencies exist and cannot be separated.
    subroutine get_scaled_selfenergy(h0, id, ish_at, nshell, cn, cn_en, &
       & dcndr, dcndL, dcn_endr, dcn_endL, selfenergy, dsedr, dsedL)
       type(tb_hamiltonian), intent(in) :: h0
@@ -51,10 +47,6 @@ contains
       integer, intent(in) :: nshell(:)
       real(wp), intent(in), optional :: cn(:)
       real(wp), intent(in), optional :: cn_en(:)
-      
-    !   real(wp), intent(out) :: selfenergy(:)
-    !   real(wp), intent(out), optional :: dsedcn(:)
-    !   real(wp), intent(out), optional :: dsedcn_en(:)
 
       real(wp), intent(in), optional :: dcndr(:,:,:)
       real(wp), intent(in), optional :: dcndL(:,:,:)
@@ -65,12 +57,10 @@ contains
       real(wp), intent(out), optional :: dsedr(:,:,:)
       real(wp), intent(out), optional :: dsedL(:,:,:)
 
-
       integer :: iat, izp, ish, ii
 
       selfenergy(:) = 0.0_wp
-    !   if (present(dsedcn)) dsedcn(:) = 0.0_wp
-    !   if (present(dsedcn_en)) dsedcn_en(:) = 0.0_wp
+
       if (present(dsedr)) dsedr(:,:,:) = 0.0_wp
       if (present(dsedL)) dsedL(:,:,:) = 0.0_wp
       do iat = 1, size(id)
@@ -80,27 +70,6 @@ contains
             selfenergy(ii+ish) = h0%selfenergy(ish, izp)
          end do
       end do
-    !   if (.not.present(cn) .or. .not.present(cn_en)) return
-    !   if (present(dsedcn) .and. present(dsedcn_en)) then
-    !      do iat = 1, size(id)
-    !         izp = id(iat)
-    !         ii = ish_at(iat)
-    !         do ish = 1, nshell(izp)
-    !            selfenergy(ii+ish) = selfenergy(ii+ish) + h0%kcn(ish, izp) * cn(iat) + &
-    !            &  h0%kcn_en(ish, izp) * cn_en(iat)
-    !            dsedcn(ii+ish) = h0%kcn(ish, izp)
-    !            dsedcn_en(ii+ish) = h0%kcn_en(ish, izp)
-    !         end do
-    !      end do
-    !   else
-    !      do iat = 1, size(id)
-    !         izp = id(iat)
-    !         ii = ish_at(iat)
-    !         do ish = 1, nshell(izp)
-    !            selfenergy(ii+ish) = selfenergy(ii+ish) + h0%kcn(ish, izp) * cn(iat) + &
-    !            &  h0%kcn_en(ish, izp) * cn_en(iat)
-    !         end do
-    !      end do
 
       if (present(cn) .and. present(cn_en)) then
          if (present(dsedr) .and. present(dsedL)) then
@@ -195,8 +164,7 @@ contains
                   & stmp, stmp_diat, dtmpi)
 
                   hij = 0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (selfenergy(is+ish) + selfenergy(js+jsh)) 
-                     
-
+                  
                   nao = msao(bas%cgto(jsh, jzp)%ang)
                   do iao = 1, msao(bas%cgto(ish, izp)%ang)
                      do jao = 1, nao
@@ -221,7 +189,7 @@ contains
 
                         !$omp atomic
                         hamiltonian(jj+jao, ii+iao) = hamiltonian(jj+jao, ii+iao) &
-                           + stmp_diat(ij) * hij
+                           + stmp_diat(ij) * hij ! 
 
                         if (iat /= jat) then
                            !$omp atomic
@@ -240,7 +208,7 @@ contains
 
                            !$omp atomic
                            hamiltonian(ii+iao, jj+jao) = hamiltonian(ii+iao, jj+jao) &
-                              + stmp_diat(ij) * hij
+                              + stmp_diat(ij) * hij ! 
                         end if
                      end do
                   end do
@@ -267,9 +235,6 @@ contains
                jj = bas%iao_sh(is+jsh)
                call dipole_cgto(bas%cgto(jsh,izp), bas%cgto(ish,izp), &
                & r2, vec, bas%intcut, stmp, dtmpi)
-
-               hij = 0.5_wp * h0%hscale(ish, jsh, izp, izp) * (selfenergy(is+ish) + selfenergy(is+jsh)) 
-
                nao = msao(bas%cgto(jsh, izp)%ang)
                do iao = 1, msao(bas%cgto(ish, izp)%ang)
                   do jao = 1, nao
@@ -282,15 +247,12 @@ contains
 
                      dpint(:, jj+jao, ii+iao) = dpint(:, jj+jao, ii+iao) &
                         + dtmpi(:, ij)
-
-                     hamiltonian(jj+jao, ii+iao) = hamiltonian(jj+jao, ii+iao) &
-                        + stmp(ij) * hij
                   end do
                end do
             end do
-            ! diagonal term (AO(i) == AO(j))
+            ! diagonal term (AO(i) == AO(j)) as on-site off-diagonal the hamiltonian is zero
             do iao = 1, msao(bas%cgto(ish, izp)%ang)
-               hamiltonian(ii+iao, ii+iao) = selfenergy(is + ish) !0.0_wp
+               hamiltonian(ii+iao, ii+iao) = selfenergy(is + ish)
             enddo
          end do
       end do
@@ -373,12 +335,9 @@ contains
                   stmp_diat = 0.0_wp 
                   dstmp_diat = 0.0_wp
 
-                  ! overlap_numgrad_cgto_diat_scal
                   call overlap_grad_cgto_diat_scal(bas%cgto(jsh,jzp), bas%cgto(ish,izp), r2, vec, &
                   & bas%intcut, h0%ksig(izp,jzp), h0%kpi(izp,jzp), h0%kdel(izp,jzp), &
                   & stmp, dstmp, stmp_diat, dstmp_diat)
-
-                  ! write(*,*) "dstmp_diat", dstmp_diat
 
                   hij = 0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (selfenergy(is+ish) + selfenergy(js+jsh))
                   
@@ -415,20 +374,7 @@ contains
                         !$omp atomic
                         dh0dr(:, ii+iao, jj+jao) = dh0dr(:, ii+iao, jj+jao) &
                            & - dstmp_diat(:,ij) * (hij) &
-                           & - stmp_diat(ij) * dhijdr(:,jat)
-
-                        
-                        
-                        !!$omp atomic
-                        !dh0dr(:, iat, ii+iao, jj+jao) = dh0dr(:, iat, ii+iao, jj+jao) &
-                        !   & + dstmp_diat(:,ij) * (hij) !&
-                        !   & + stmp_diat(ij) * 0.5_wp * h0%hscale(jsh, ish, jzp, izp) &
-                        !   & * (dsedr(:,iat,is+ish) + dsedr(:,iat,js+jsh)) ! dhijdr(:,iat)
-                        !!$omp atomic
-                        !dh0dr(:, jat, ii+iao, jj+jao) = dh0dr(:, jat, ii+iao, jj+jao) &
-                        !   & - dstmp_diat(:,ij) * (hij) !&
-                        !   & + stmp_diat(ij) * 0.5_wp * h0%hscale(jsh, ish, jzp, izp) &
-                        !   & * (dsedr(:,jat,js+jsh) + dsedr(:,jat,is+ish)) ! dhijdr(:,jat)
+                           & - stmp_diat(ij) * dhijdr(:,iat)
 
                         !dh0dL(:,:,jj+jao, ii+iao) = dh0dL(:,:,jj+jao, ii+iao) &
                         !   & + spread(dstmp_diat(:,ij) * (hij + sval), 1, 3) !+ stmp_diat(ij) * dhijdL(:,:)
@@ -444,7 +390,7 @@ contains
    
       !$omp parallel do schedule(runtime) default(none) reduction(+:dEdcn) &
       !$omp shared(mol, bas) &
-      !$omp private(iat, izp, jzp, is, ish, ii, iao, dcni, dhdcni, spin)
+      !$omp private(iat, izp, jzp, is, ish, ii, iao)
       do iat = 1, mol%nat
          izp = mol%id(iat)
          is = bas%ish_at(iat)
@@ -453,43 +399,9 @@ contains
          rr = sqrt(sqrt(r2) / (h0%rad(izp) + h0%rad(izp)))
          do ish = 1, bas%nsh_id(izp)
             ii = bas%iao_sh(is+ish)
-            ! do jsh = 1, bas%nsh_id(izp)
-            !    jj = bas%iao_sh(is+jsh)
-
-            !    stmp = 0.0_wp
-            !    dstmp = 0.0_wp
-            !    stmp_diat = 0.0_wp 
-            !    dstmp_diat = 0.0_wp
-
-            !    call overlap_grad_cgto_diat_scal(bas%cgto(ish,izp), bas%cgto(ish,izp), r2, vec, &
-            !       & bas%intcut, h0%ksig(izp,izp), h0%kpi(izp,izp), h0%kdel(izp,izp), &
-            !       & stmp, dstmp, stmp_diat, dstmp_diat)
-
-            !    hij = 0.5_wp         * h0%hscale(ish, ish, izp, izp)
-
-            !    nao = msao(bas%cgto(jsh, izp)%ang)
-            !    do iao = 1, msao(bas%cgto(ish, izp)%ang)
-            !       do jao = 1, nao
-            !          ij = jao + nao*(iao-1)
-            !          !$omp atomic
-            !          dh0dr(:, iat, jj+jao, ii+iao) = dh0dr(:, iat, jj+jao, ii+iao) &
-            !             & - dstmp_diat(:,ij) * (0.5_wp * h0%hscale(jsh, ish, izp, izp)) !&
-            !             !& + stmp_diat(ij) * 0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (dsedr(:,iat,is+ish) + dsedr(:,iat,is+jsh)) ! dhijdr(:,iat)
-                  
-            !          !$omp atomic
-            !          !dh0dr(:, iat, ii+iao, jj+jao) = dh0dr(:, iat, ii+iao, jj+jao) &
-            !          !   & - dstmp_diat(:,ij) * (0.5_wp * h0%hscale(jsh, ish, izp, izp)) !&
-            !          !   !& - stmp_diat(ij) * 0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (dsedr(:,iat,is+ish) + dsedr(:,iat,is+jsh)) ! dhijdr(:,iat)
-
-            !       end do
-            !    end do
-            ! end do
             !> diagonal term (AO(i) == AO(j))
             do iao = 1, msao(bas%cgto(ish, izp)%ang)
-               !do jat = 1, mol%nat
-                 !write(*,*) "hallo", jat, ii+iao, is+ish,  dsedr(:,jat,is+ish)
-                 dh0dr(:, ii+iao, ii+iao) = dsedr(:,iat,is+ish) !dh0dr(:, ii+iao, ii+iao)
-               !end do
+               dh0dr(:, ii+iao, ii+iao) = dsedr(:,iat,is+ish)
             enddo
          end do
       end do

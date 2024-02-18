@@ -501,6 +501,7 @@ contains
 
       call new_ncoord(calc%ncoord, mol, cn_type="erf", &
       & rcov=ceh_cov_radii(mol%num))
+
    end subroutine add_ncoord
 
 
@@ -512,6 +513,7 @@ contains
 
       call new_ncoord(calc%ncoord_en, mol, cn_type="erf_en", &
       & rcov=ceh_cov_radii(mol%num), en=pauling_en_ceh(mol%num))
+
    end subroutine add_ncoord_en
 
 
@@ -591,6 +593,7 @@ contains
             selfenergy(ish, isp) = p_ceh_selfenergy(ish, izp)
          end do
       end do
+      
    end subroutine get_selfenergy
 
 
