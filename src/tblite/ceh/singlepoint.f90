@@ -20,6 +20,9 @@
 
 !> Implementation of the single point calculation for the CEH model
 module tblite_ceh_singlepoint
+
+   use iso_fortran_env, only: output_unit
+
    use mctc_env, only : error_type, wp
    use mctc_io, only: structure_type
    use tblite_adjlist, only : adjacency_list, new_adjacency_list
@@ -31,7 +34,7 @@ module tblite_ceh_singlepoint
    use tblite_wavefunction, only : wavefunction_type, &
    & get_alpha_beta_occupation
    use tblite_wavefunction_mulliken, only: get_mulliken_shell_charges, &
-   & get_mulliken_atomic_multipoles, get_mulliken_shell_charges_gradient
+   & get_mulliken_atomic_multipoles, get_mulliken_atomic_charges_gradient
    use tblite_scf_iterator, only: get_density, get_qat_from_qsh
    use tblite_scf, only: new_potential, potential_type 
    use tblite_container, only : container_cache
@@ -109,7 +112,7 @@ contains
       !> CEH matrix element derivative arrays: 
       real(wp), allocatable :: dh0dr(:,:,:), dh0dL(:,:,:), doverlap(:,:,:), doverlap_diat(:,:,:)
       !> CEH density matrix derivative: 
-      real(wp), allocatable :: ddensitydr(:,:,:), ddensitydL(:,:,:)
+      real(wp), allocatable :: ddensitydr(:,:,:,:), ddensitydL(:,:,:,:)
 
       call timer%push("wall time CEH")
 
@@ -150,9 +153,6 @@ contains
       end if
 
       ! calculate the scaled self energies
-    !   allocate(selfenergy(calc%bas%nsh), dsedcn(calc%bas%nsh), dsedcn_en(calc%bas%nsh))
-    !   call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, cn=cn, cn_en=cn_en, &
-    !   & selfenergy=selfenergy, dsedcn=dsedcn, dsedcn_en=dsedcn_en)
       allocate(selfenergy(calc%bas%nsh)) 
       if (grad) then
          allocate(dsedr(3, mol%nat,calc%bas%nsh), dsedL(3, 3, calc%bas%nsh))
@@ -214,7 +214,7 @@ contains
       if (grad) then
          allocate(dh0dr(3,calc%bas%nao,calc%bas%nao),&
          & dh0dL(3,calc%bas%nao,calc%bas%nao),doverlap(3,calc%bas%nao,calc%bas%nao),doverlap_diat(3,calc%bas%nao,calc%bas%nao),&
-         &ddensitydr(3,calc%bas%nao,calc%bas%nao),ddensitydL(3,calc%bas%nao,calc%bas%nao))
+         & ddensitydr(3,calc%bas%nao,calc%bas%nao,1),ddensitydL(3,calc%bas%nao,calc%bas%nao,1))
          dh0dr(:, :, :) = 0.0_wp
          dh0dL(:, :, :) = 0.0_wp
          doverlap(:, :, :) = 0.0_wp
@@ -223,15 +223,62 @@ contains
             & dsedr, dsedL, pot, wfn%density, dh0dr, dh0dL, doverlap, doverlap_diat)
          ! Use the matrix element derivatives (F + S) to get the density matrix graidient
          ! based on the coupled-perturbed formalism
-         call get_density_matrix_gradient(mol,calc%bas,wfn,list,doverlap,dh0dr,dh0dL,ddensitydr,ddensitydL)
+         call get_density_matrix_gradient(mol,calc%bas,wfn,list,dh0dr,dh0dL,doverlap,ddensitydr(:,:,:,1),ddensitydL(:,:,:,1))
 
          ! Derivative of the CEH Mulliken charges
-         call get_mulliken_shell_charges_gradient(calc%bas, ints%overlap, wfn%density, &
+         call get_mulliken_atomic_charges_gradient(calc%bas, ints%overlap, wfn%density, &
          & doverlap, ddensitydr, ddensitydL, wfn%dqdr, wfn%dqdL)
 
       end if 
       call timer%pop()
 
     end subroutine ceh_guess
+
+
+
+
+  subroutine write_2d_matrix(matrix, name, unit, step)
+    implicit none
+    real(wp), intent(in) :: matrix(:, :)
+    character(len=*), intent(in), optional :: name
+    integer, intent(in), optional :: unit
+    integer, intent(in), optional :: step
+    integer :: d1, d2
+    integer :: i, j, k, l, istep, iunit
+
+    d1 = size(matrix, dim=1)
+    d2 = size(matrix, dim=2)
+
+    if (present(unit)) then
+      iunit = unit
+    else
+      iunit = output_unit
+    end if
+
+    if (present(step)) then
+      istep = step
+    else
+      istep = 6
+    end if
+
+    if (present(name)) write (iunit, '(/,"matrix printed:",1x,a)') name
+
+    do i = 1, d2, istep
+      l = min(i + istep - 1, d2)
+      write (iunit, '(/,6x)', advance='no')
+      do k = i, l
+        write (iunit, '(6x,i7,3x)', advance='no') k
+      end do
+      write (iunit, '(a)')
+      do j = 1, d1
+        write (iunit, '(i6)', advance='no') j
+        do k = i, l
+          write (iunit, '(1x,f15.8)', advance='no') matrix(j, k)
+        end do
+        write (iunit, '(a)')
+      end do
+    end do
+
+  end subroutine write_2d_matrix
 
 end module tblite_ceh_singlepoint

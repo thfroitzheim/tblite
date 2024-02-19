@@ -21,6 +21,7 @@
 !> Implementation of the coupled-perturbed equations for the
 !> density matrix and Mulliken charge derivatives
 module tblite_ceh_coupled_perturbed
+   use iso_fortran_env, only: output_unit
    use mctc_env, only : error_type, wp
    use mctc_io, only: structure_type
    use tblite_adjlist, only : adjacency_list, new_adjacency_list
@@ -32,13 +33,12 @@ module tblite_ceh_coupled_perturbed
    & get_alpha_beta_occupation
    use tblite_wavefunction_mulliken, only: get_mulliken_shell_charges, &
    & get_mulliken_atomic_multipoles
-   use tblite_blas, only : gemv
+   use tblite_wavefunction_fermi, only : get_fermi_filling_gradient
+   use tblite_blas, only : gemm
    implicit none
    private
 
    public :: get_density_matrix_gradient
-
-   real(wp), parameter :: cn_cutoff = 25.0_wp
 
 contains
 
@@ -60,21 +60,118 @@ contains
       !> Derivative of the electronic energy w.r.t. coordinate displacements
       real(wp), intent(in) :: doverlap(:, :, :)
       !> Derivative of the electronic energy w.r.t. coordinate displacements
-      real(wp), intent(in) :: ddensitydr(:, :, :)
+      real(wp), intent(out) :: ddensitydr(:, :, :)
       !> Derivative of the electronic energy w.r.t. the lattice vector
-      real(wp), intent(in) :: ddensitydL(:, :, :)
+      real(wp), intent(out) :: ddensitydL(:, :, :)
 
-      ! Transform the derivatives of Fock and overlap matrix into the MO basis
+      integer :: ic, iao, jao, homo
+      real(wp) :: denom, e_fermi
+      real(wp), allocatable :: dh0dr_mo(:,:), doverlap_mo(:,:), ddensitydr_mo(:,:), tmp(:,:)
+      real(wp), allocatable :: u_mo(:,:), demo(:)
+      real(wp), allocatable :: focc(:), dfocc(:)
 
-      ! Determine the unitary transformation matrix from the unperturbed 
-      ! to the perturbed basis coefficient matrix
+      allocate(dh0dr_mo(bas%nao,bas%nao), doverlap_mo(bas%nao,bas%nao), ddensitydr_mo(bas%nao,bas%nao), &
+      & tmp(bas%nao,bas%nao), u_mo(bas%nao,bas%nao), demo(bas%nao), focc(bas%nao), dfocc(bas%nao), &
+      & source = 0.0_wp)
 
-      ! Determine the occupation number derivative based on the Fermi-Smearing
+      do ic = 1, 3
+         ! Transform the derivatives of Fock and overlap matrix into the MO basis: X_mo^(1) = C^T x X^(1) x C
+         ! Fock matrix
+         call gemm(amat=wfn%coeff(:,:,1),bmat=dh0dr(ic,:,:),cmat=tmp,transa='T',transb='N')
+         call gemm(amat=tmp,bmat=wfn%coeff(:,:,1),cmat=dh0dr_mo(:,:),transa='N',transb='N')
+         ! Overlap
+         call gemm(amat=wfn%coeff(:,:,1),bmat=doverlap(ic,:,:),cmat=tmp,transa='T',transb='N')
+         call gemm(amat=tmp,bmat=wfn%coeff(:,:,1),cmat=doverlap_mo(:,:),transa='N',transb='N')
 
-      ! Calculate the first derivative of the density matrix in the MO basis
+         ! Determine the eigen value derivative E^(1)_pp = (F_mo^{1}_pp - S_mo^(1)_pp * E^(0)_pp)
+         do iao = 1, bas%nao
+            demo(iao) = dh0dr_mo(iao,iao) - doverlap_mo(iao,iao) * wfn%emo(iao,1)
+         end do 
 
-      ! Transform the first derivative of the density matrix back to the AO basis
+         ! Determine the occupation number derivative based on the Fermi-Smearing
+         call get_fermi_filling_gradient(wfn%nel(1), wfn%kt, wfn%emo(:,1), demo, &
+         & homo, focc, dfocc, e_fermi)
+
+         ! Determine the unitary transformation matrix derivative from the unperturbed to the perturbed basis matrix
+         do iao = 1, homo
+            do jao = iao+1, homo
+               ! Diagonal terms: u^(1)_qp = -0.5 S_mo^(1)_qp
+               u_mo(iao,jao) = -0.5_wp * doverlap_mo(iao,jao)
+               u_mo(jao,iao) = -0.5_wp * doverlap_mo(jao,iao)
+            end do 
+            do jao = homo + 1, bas%nao
+               ! occ-virt terms: u^(1)_qp = (F_mo^(1)_qp - S_mo^(1)_qp * E^(0)_pp) / (E^(0)_pp - E^(0)_qq)
+               denom = wfn%emo(iao,1)-wfn%emo(jao,1)
+               u_mo(iao,jao) = (dh0dr_mo(iao,jao) - doverlap_mo(iao,jao) * wfn%emo(iao,1))/denom
+               u_mo(jao,iao) = u_mo(iao,jao)
+            end do 
+         end do 
+         do iao = 1, bas%nao
+            ! Diagonal terms: u^(1)_pp = -0.5 S_mo^(1)_pp
+            u_mo(iao,iao) = -0.5_wp * doverlap_mo(iao,iao)
+         end do 
+
+         ! Calculate the first derivative of the density matrix in the MO basis
+         do iao = 1, bas%nao
+            do jao = 1, bas%nao
+               ! Unitary transformation matrix derivative terms: P_mo^(1)_qp = u^(1)_qp*n^(0)_p + n^(0)_q*u^(1)_qp
+               ddensitydr_mo(iao,jao) = ddensitydr_mo(iao,jao) + u_mo(iao,jao)*focc(jao) + focc(iao)*u_mo(jao,iao)
+            end do
+            ! Occupation number derivative terms: P_mo^(1)_pp = n^(1)_p
+            ddensitydr_mo(iao,iao) = ddensitydr_mo(iao,iao) + dfocc(iao)
+         end do
+
+         ! Transform the first derivative of the density matrix back to the AO basis: P^(1) = C x P_mo^(1) x C^T
+         call gemm(amat=wfn%coeff(:,:,1),bmat=ddensitydr_mo(:,:),cmat=tmp,transa='N',transb='N')
+         call gemm(amat=tmp,bmat=wfn%coeff(:,:,1),cmat=ddensitydr(ic,:,:),transa='N',transb='T')
+
+      end do
 
     end subroutine get_density_matrix_gradient
+
+
+  subroutine write_2d_matrix(matrix, name, unit, step)
+    implicit none
+    real(wp), intent(in) :: matrix(:, :)
+    character(len=*), intent(in), optional :: name
+    integer, intent(in), optional :: unit
+    integer, intent(in), optional :: step
+    integer :: d1, d2
+    integer :: i, j, k, l, istep, iunit
+
+    d1 = size(matrix, dim=1)
+    d2 = size(matrix, dim=2)
+
+    if (present(unit)) then
+      iunit = unit
+    else
+      iunit = output_unit
+    end if
+
+    if (present(step)) then
+      istep = step
+    else
+      istep = 6
+    end if
+
+    if (present(name)) write (iunit, '(/,"matrix printed:",1x,a)') name
+
+    do i = 1, d2, istep
+      l = min(i + istep - 1, d2)
+      write (iunit, '(/,6x)', advance='no')
+      do k = i, l
+        write (iunit, '(6x,i7,3x)', advance='no') k
+      end do
+      write (iunit, '(a)')
+      do j = 1, d1
+        write (iunit, '(i6)', advance='no') j
+        do k = i, l
+          write (iunit, '(1x,f15.8)', advance='no') matrix(j, k)
+        end do
+        write (iunit, '(a)')
+      end do
+    end do
+
+  end subroutine write_2d_matrix
 
 end module tblite_ceh_coupled_perturbed

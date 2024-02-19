@@ -263,10 +263,6 @@ subroutine test_overlap_mol(error, mol, ref)
    !where(abs(overlap) < thr) overlap = 0.0_wp
    !print '(*(6x,"&", 3(es20.14e1, "_wp":, ","), "&", /))', overlap
 
-   write (*, *) "overlap"
-   write(*, '(*(6x,SP,"& ",3(es20.13e2, "":, "_wp, "), "", /))', advance='no') overlap
-   
-
    do ii = 1, size(overlap, 2)
       do jj = 1, size(overlap, 1)
          call check(error, overlap(jj, ii), ref(jj, ii), thr=thr)

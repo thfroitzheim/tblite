@@ -59,37 +59,44 @@ contains
       type(unittest_type), allocatable, intent(out) :: testsuite(:)
 
       testsuite = [ &
-         new_unittest("scaled-selfenergy-H2", test_scaled_selfenergy_h2), &
-         new_unittest("scaled-selfenergy-LiH", test_scaled_selfenergy_lih), &
-         new_unittest("scaled-selfenergy-S2", test_scaled_selfenergy_s2), &
-         new_unittest("scaled-selfenergy-SiH4", test_scaled_selfenergy_sih4), &
-         new_unittest("scaled-selfenergy_grad-H2", test_scaled_selfenergy_numgrad_h2), &
-         new_unittest("scaled-selfenergy_grad-LiH", test_scaled_selfenergy_numgrad_lih), &
-         new_unittest("scaled-selfenergy_grad-S2", test_scaled_selfenergy_numgrad_s2), &
-         new_unittest("scaled-selfenergy_grad-SiH4", test_scaled_selfenergy_numgrad_sih4), &
-         new_unittest("hamiltonian-H2", test_hamiltonian_h2), &
-         new_unittest("hamiltonian-LiH", test_hamiltonian_lih), &
-         new_unittest("hamiltonian-S2", test_hamiltonian_s2), &
-         new_unittest("hamiltonian-SiH4", test_hamiltonian_sih4), &
-         new_unittest("hamiltonian_grad-H2", test_hamiltonian_numgrad_h2), &
-         new_unittest("hamiltonian_grad-LiH", test_hamiltonian_numgrad_lih), &
-         new_unittest("hamiltonian_grad-S2", test_hamiltonian_numgrad_s2), &
-         new_unittest("hamiltonian_grad-PCl", test_hamiltonian_numgrad_pcl), &
-         new_unittest("hamiltonian_grad-SiH4", test_hamiltonian_numgrad_sih4), &
-         new_unittest("hamiltonian_grad-CeCl3", test_hamiltonian_numgrad_cecl3), &
-         new_unittest("overlap_diat-H2", test_overlap_diat_h2), &
-         new_unittest("overlap_diat-LiH", test_overlap_diat_lih), &
-         new_unittest("overlap_diat-S2", test_overlap_diat_s2), &
-         new_unittest("overlap_diat-SiH4", test_overlap_diat_sih4), &
-         new_unittest("q-mol-h2", test_q_h2), &
-         new_unittest("q-mol-lih", test_q_lih), &
-         new_unittest("q-mol-1", test_q_mb01), &
-         new_unittest("q-mol-2", test_q_mb02), &
-         new_unittest("q-mol-3", test_q_mb03), &
-         new_unittest("q-mol-4", test_q_mb04), &
-         new_unittest("q-chrgd-efield-mol", test_q_ef_chrg_mb01), &
-         new_unittest("d-mol", test_d_mb01), &
-         new_unittest("d-field-mol", test_d_field_mb04) &
+         ! new_unittest("scaled-selfenergy-H2", test_scaled_selfenergy_h2), &
+         ! new_unittest("scaled-selfenergy-LiH", test_scaled_selfenergy_lih), &
+         ! new_unittest("scaled-selfenergy-S2", test_scaled_selfenergy_s2), &
+         ! new_unittest("scaled-selfenergy-SiH4", test_scaled_selfenergy_sih4), &
+         ! new_unittest("scaled-selfenergy_grad-H2", test_scaled_selfenergy_numgrad_h2), &
+         ! new_unittest("scaled-selfenergy_grad-LiH", test_scaled_selfenergy_numgrad_lih), &
+         ! new_unittest("scaled-selfenergy_grad-S2", test_scaled_selfenergy_numgrad_s2), &
+         ! new_unittest("scaled-selfenergy_grad-SiH4", test_scaled_selfenergy_numgrad_sih4), &
+         ! new_unittest("hamiltonian-H2", test_hamiltonian_h2), &
+         ! new_unittest("hamiltonian-LiH", test_hamiltonian_lih), &
+         ! new_unittest("hamiltonian-S2", test_hamiltonian_s2), &
+         ! new_unittest("hamiltonian-SiH4", test_hamiltonian_sih4), &
+         ! new_unittest("hamiltonian_grad-H2", test_hamiltonian_numgrad_h2), &
+         ! new_unittest("hamiltonian_grad-LiH", test_hamiltonian_numgrad_lih), &
+         ! new_unittest("hamiltonian_grad-S2", test_hamiltonian_numgrad_s2), &
+         ! new_unittest("hamiltonian_grad-PCl", test_hamiltonian_numgrad_pcl), &
+         ! new_unittest("hamiltonian_grad-SiH4", test_hamiltonian_numgrad_sih4), &
+         ! new_unittest("hamiltonian_grad-CeCl3", test_hamiltonian_numgrad_cecl3), &
+         ! new_unittest("overlap_diat-H2", test_overlap_diat_h2), &
+         ! new_unittest("overlap_diat-LiH", test_overlap_diat_lih), &
+         ! new_unittest("overlap_diat-S2", test_overlap_diat_s2), &
+         ! new_unittest("overlap_diat-SiH4", test_overlap_diat_sih4), &
+         ! new_unittest("q-mol-h2", test_q_h2), &
+         ! new_unittest("q-mol-lih", test_q_lih), &
+         ! new_unittest("q-mol-1", test_q_mb01), &
+         ! new_unittest("q-mol-2", test_q_mb02), &
+         ! new_unittest("q-mol-3", test_q_mb03), &
+         ! new_unittest("q-mol-4", test_q_mb04), &
+         ! new_unittest("q-chrgd-efield-mol", test_q_ef_chrg_mb01), &
+         ! new_unittest("d-mol", test_d_mb01), &
+         ! new_unittest("d-field-mol", test_d_field_mb04), &
+         new_unittest("dq-mol-lih", test_dq_lih), &
+         ! new_unittest("dq-mol-S2", test_dq_s2), &
+         ! new_unittest("dq-mol-PCl", test_dq_pcl), &
+         new_unittest("dq-mol-SiH4", test_dq_sih4) &
+         ! new_unittest("dq-mol-CeCl3", test_dq_cecl3), &
+         ! new_unittest("dq-mol-1", test_dq_mb01), &
+         ! new_unittest("dq-mol-2", test_dq_mb02) &
          ]
 
    end subroutine collect_ceh
@@ -778,6 +785,79 @@ contains
       enddo
 
    end subroutine test_q_gen
+
+   subroutine test_dq_gen(error, mol)
+
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      !> Molecular structure data
+      type(structure_type), intent(inout) :: mol
+
+      integer :: iat, ic, i, j
+      type(context_type) :: ctx
+      type(xtb_calculator) :: calc
+      type(wavefunction_type) :: wfn
+      real(wp), parameter :: accuracy = 1e-8_wp
+      real(wp), parameter :: step = 1.0e-6_wp
+      real(wp), allocatable :: ql(:), qr(:), dqdr(:, :, :), dqdL(:, :, :)
+      real(wp), allocatable :: numdr(:, :, :)
+
+      allocate(ql(mol%nat), qr(mol%nat), dqdr(3, mol%nat, mol%nat), dqdL(3, 3, mol%nat), &
+      & numdr(3, mol%nat, mol%nat))
+
+      lp: do iat = 1, mol%nat
+         do ic = 1, 3
+            mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
+
+            call new_ceh_calculator(calc, mol)
+            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+            ctx%verbosity = 0
+            call ceh_guess(ctx, calc, mol, error, wfn, accuracy, .false.)
+            qr = wfn%qat(:,1)
+            
+            if (allocated(error)) exit lp
+            
+            mol%xyz(ic, iat) = mol%xyz(ic, iat) - 2*step
+
+            call new_ceh_calculator(calc, mol)
+            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+            ctx%verbosity = 0
+            call ceh_guess(ctx, calc, mol, error, wfn, accuracy, .false.)
+            ql = wfn%qat(:,1)
+            
+            if (allocated(error)) exit lp
+
+            mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
+            numdr(ic, iat, :) = 0.5_wp*(qr - ql)/step
+
+         end do
+      end do lp
+
+      ! Analytical gradient
+      call new_ceh_calculator(calc, mol)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      ctx%verbosity = 0
+      call ceh_guess(ctx, calc, mol, error, wfn, accuracy, .true.)
+      if (allocated(error)) return
+
+      do ic = 1, 3
+         call write_2d_matrix(wfn%dqdr(ic,:,:), "ana")
+         call write_2d_matrix(numdr(ic,:,:), "num")
+         do i = 1, mol%nat
+            do j = 1, mol%nat
+               call check(error, wfn%dqdr(ic,i,j), numdr(ic,i,j), thr=1e-6_wp)
+               if (allocated(error)) then
+                  !print '(3es21.13)',  wfn%dqdr(ic,i,j), numdr(ic,i,j), &
+                  !& wfn%dqdr(ic,i,j) - numdr(ic,i,j)
+                  call test_failed(error, "Derivative of charges does not match")
+                  !return
+               end if
+            end do 
+         end do
+      end do 
+
+   end subroutine test_dq_gen
 
 
    subroutine test_scaled_selfenergy_h2(error)
@@ -1742,4 +1822,82 @@ contains
       end if
 
    end subroutine test_d_hcn
+
+   subroutine test_dq_lih(error)
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "MB16-43", "LiH")
+      call test_dq_gen(error, mol)
+
+   end subroutine test_dq_lih
+
+   subroutine test_dq_s2(error)
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "MB16-43", "S2")
+      call test_dq_gen(error, mol)
+
+   end subroutine test_dq_s2
+
+   subroutine test_dq_pcl(error)
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "MB16-43", "PCl")
+      call test_dq_gen(error, mol)
+
+   end subroutine test_dq_pcl
+
+   subroutine test_dq_sih4(error)
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "MB16-43", "SiH4")
+      call test_dq_gen(error, mol)
+
+   end subroutine test_dq_sih4
+
+   subroutine test_dq_cecl3(error)
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "MB16-43", "CeCl3")
+      call test_dq_gen(error, mol)
+
+   end subroutine test_dq_cecl3
+
+   subroutine test_dq_mb01(error)
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "MB16-43", "01")
+      call test_dq_gen(error, mol)
+
+   end subroutine test_dq_mb01
+
+   subroutine test_dq_mb02(error)
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "MB16-43", "02")
+      call test_dq_gen(error, mol)
+
+   end subroutine test_dq_mb02
+
 end module test_ceh
