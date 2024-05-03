@@ -30,7 +30,7 @@ module tblite_integral_overlap
    implicit none
    private
 
-   public :: overlap_cgto, overlap_cgto_diat_scal, overlap_grad_cgto, overlap_grad_cgto_diat_scal, overlap_numgrad_cgto_diat_scal
+   public :: overlap_cgto, overlap_cgto_diat_scal, overlap_grad_cgto, overlap_grad_cgto_diat_scal
    public :: get_overlap
    public :: maxl, msao
 
@@ -472,62 +472,6 @@ pure subroutine overlap_grad_cgto(cgtoj, cgtoi, r2, vec, intcut, overlap, doverl
    call transform1(cgtoj%ang, cgtoi%ang, ds3d, doverlap)
 
 end subroutine overlap_grad_cgto
-
-subroutine overlap_numgrad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &
-&  ksig, kpi, kdel, overlap, doverlap, overlap_scaled, doverlap_scaled)
-
-   !> Description of contracted Gaussian function on center i
-   type(cgto_type), intent(in) :: cgtoi
-   !> Description of contracted Gaussian function on center j
-   type(cgto_type), intent(in) :: cgtoj
-   !> Square distance between center i and j
-   real(wp), intent(in) :: r2
-   !> Distance vector between center i and j, ri - rj
-   real(wp), intent(in) :: vec(3)
-   !> Scaling factors for the diatomic frame for the three differnt bonding motifs
-   real(wp), intent(in) :: ksig, kpi, kdel
-   !> Maximum value of integral prefactor to consider
-   real(wp), intent(in) :: intcut
-   !> Overlap integrals for the given pair i  and j
-   real(wp), intent(out) :: overlap(msao(cgtoj%ang), msao(cgtoi%ang))
-   !> Overlap integral gradient for the given pair i  and j
-   real(wp), intent(out) :: doverlap(3, msao(cgtoj%ang), msao(cgtoi%ang))
-   !> Overlap integrals for the given pair i  and j
-   real(wp), intent(out) :: overlap_scaled(msao(cgtoj%ang), msao(cgtoi%ang))
-   !> Overlap integral gradient for the given pair i  and j
-   real(wp), intent(out) :: doverlap_scaled(3, msao(cgtoj%ang), msao(cgtoi%ang))
-
-   real(wp), allocatable :: sr_scaled(:,:), sl_scaled(:,:), sr(:,:), sl(:,:)
-   integer :: ic 
-   real(wp) :: tmp_vec(3), tmp_r2
-   real(wp), parameter :: step = 1.0e-6_wp
-
-   tmp_vec = vec
-   tmp_r2 = r2
-
-   allocate(sr_scaled(msao(cgtoj%ang), msao(cgtoi%ang)), sl_scaled(msao(cgtoj%ang), msao(cgtoi%ang)), &
-   & sr(msao(cgtoj%ang), msao(cgtoi%ang)), sl(msao(cgtoj%ang), msao(cgtoi%ang)))
-
-   call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, vec,&
-      & intcut, ksig, kpi, kdel, overlap, overlap_scaled)   
-
-   do ic = 1, 3
-      tmp_vec(ic) = tmp_vec(ic) + step
-      tmp_r2 = sum(tmp_vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, tmp_r2, tmp_vec,&
-      & intcut, ksig, kpi, kdel, sr, sr_scaled)
-      
-      tmp_vec(ic) = tmp_vec(ic) - 2*step
-      tmp_r2 = sum(tmp_vec**2)
-      call overlap_cgto_diat_scal(cgtoj, cgtoi, r2, tmp_vec,&
-      & intcut, ksig, kpi, kdel, sl, sl_scaled)
-
-      tmp_vec(ic) = tmp_vec(ic) + step
-      doverlap(ic, :, :) = 0.5_wp * (sr - sl) / step
-      doverlap_scaled(ic, :, :) = 0.5_wp * (sr_scaled - sl_scaled) / step
-   end do
-
-end subroutine overlap_numgrad_cgto_diat_scal
 
 
 pure subroutine overlap_grad_cgto_diat_scal(cgtoj, cgtoi, r2, vec, intcut, &

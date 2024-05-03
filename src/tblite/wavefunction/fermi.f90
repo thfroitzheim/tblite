@@ -42,11 +42,12 @@ subroutine get_fermi_filling(nel, kt, emo, homo, focc, e_fermi)
 
    call get_aufbau_filling(nel, homo, focc)
 
-   if (homo > 0) then
+   ! Optimize the Fermilevel if there is a finite temperature
+   if (homo > 0 .and. kt .gt. 0) then
       call get_fermi_filling_(homo, kt, emo, focc, etmp)
       e_fermi = 0.5_wp * etmp
    end if
-
+   
 end subroutine get_fermi_filling
 
 subroutine get_fermi_filling_gradient(nel, kt, emo, demo, homo, focc, dfocc, e_fermi)

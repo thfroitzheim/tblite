@@ -27,7 +27,7 @@ module tblite_ceh_h0
    use tblite_xtb_h0, only : tb_hamiltonian
    use tblite_integral_dipole, only: get_dipole_integrals, dipole_cgto, &
    & dipole_cgto_diat_scal, maxl, msao
-   use tblite_integral_overlap, only: overlap_grad_cgto_diat_scal, overlap_numgrad_cgto_diat_scal
+   use tblite_integral_overlap, only: overlap_grad_cgto_diat_scal
    use tblite_adjlist, only : adjacency_list
    use tblite_scf_potential, only : potential_type
 
@@ -406,7 +406,7 @@ contains
             enddo
          end do
       end do
-      
+
    end subroutine get_hamiltonian_gradient
 
 

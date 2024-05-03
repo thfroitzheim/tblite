@@ -64,7 +64,7 @@ contains
       !> Derivative of the electronic energy w.r.t. the lattice vector
       real(wp), intent(out) :: ddensitydL(:, :, :)
 
-      integer :: ic, iao, jao, homo
+      integer :: ic, iao, jao, homo, spin
       real(wp) :: denom, e_fermi
       real(wp), allocatable :: dh0dr_mo(:,:), doverlap_mo(:,:), ddensitydr_mo(:,:), tmp(:,:)
       real(wp), allocatable :: u_mo(:,:), demo(:)
@@ -75,11 +75,17 @@ contains
       & source = 0.0_wp)
 
       do ic = 1, 3
+
+         ddensitydr_mo = 0.0_wp
+         demo = 0.0_wp
+         tmp = 0.0_wp
+         u_mo = 0.0_wp
+
          ! Transform the derivatives of Fock and overlap matrix into the MO basis: X_mo^(1) = C^T x X^(1) x C
-         ! Fock matrix
+         ! Fock matrix derivative
          call gemm(amat=wfn%coeff(:,:,1),bmat=dh0dr(ic,:,:),cmat=tmp,transa='T',transb='N')
          call gemm(amat=tmp,bmat=wfn%coeff(:,:,1),cmat=dh0dr_mo(:,:),transa='N',transb='N')
-         ! Overlap
+         ! Overlap derivative
          call gemm(amat=wfn%coeff(:,:,1),bmat=doverlap(ic,:,:),cmat=tmp,transa='T',transb='N')
          call gemm(amat=tmp,bmat=wfn%coeff(:,:,1),cmat=doverlap_mo(:,:),transa='N',transb='N')
 
@@ -92,18 +98,29 @@ contains
          call get_fermi_filling_gradient(wfn%nel(1), wfn%kt, wfn%emo(:,1), demo, &
          & homo, focc, dfocc, e_fermi)
 
+         do spin = 1, 2
+            call get_fermi_filling_gradient(wfn%nel(spin), wfn%kt, wfn%emo(:,1), demo, &
+            & homo, focc, dfocc, e_fermi)
+            ! + dfocc
+         end do
+
          ! Determine the unitary transformation matrix derivative from the unperturbed to the perturbed basis matrix
          do iao = 1, homo
             do jao = iao+1, homo
-               ! Diagonal terms: u^(1)_qp = -0.5 S_mo^(1)_qp
+               ! Off-diagonal occ-occ terms: u^(1)_qp = -0.5 S_mo^(1)_qp
                u_mo(iao,jao) = -0.5_wp * doverlap_mo(iao,jao)
-               u_mo(jao,iao) = -0.5_wp * doverlap_mo(jao,iao)
+               !u_mo(jao,iao) = -0.5_wp * doverlap_mo(jao,iao)
             end do 
             do jao = homo + 1, bas%nao
+               !denom = wfn%emo(jao,1)-wfn%emo(iao,1)
                ! occ-virt terms: u^(1)_qp = (F_mo^(1)_qp - S_mo^(1)_qp * E^(0)_pp) / (E^(0)_pp - E^(0)_qq)
                denom = wfn%emo(iao,1)-wfn%emo(jao,1)
-               u_mo(iao,jao) = (dh0dr_mo(iao,jao) - doverlap_mo(iao,jao) * wfn%emo(iao,1))/denom
-               u_mo(jao,iao) = u_mo(iao,jao)
+               u_mo(iao,jao) = u_mo(iao,jao) + (dh0dr_mo(iao,jao) - doverlap_mo(iao,jao) * wfn%emo(iao,1))/denom
+               u_mo(jao,iao) = -u_mo(iao,jao)   
+               !denom = wfn%emo(jao,1)-wfn%emo(iao,1)
+               !u_mo(jao,iao) = u_mo(jao,iao) + (dh0dr_mo(jao,iao) - doverlap_mo(jao,iao) * wfn%emo(jao,1))/denom
+               !u_mo(jao,iao) = (dh0dr_mo(jao,iao) - doverlap_mo(jao,iao) * wfn%emo(iao,1))/denom
+               
             end do 
          end do 
          do iao = 1, bas%nao
@@ -115,12 +132,12 @@ contains
          do iao = 1, bas%nao
             do jao = 1, bas%nao
                ! Unitary transformation matrix derivative terms: P_mo^(1)_qp = u^(1)_qp*n^(0)_p + n^(0)_q*u^(1)_qp
-               ddensitydr_mo(iao,jao) = ddensitydr_mo(iao,jao) + u_mo(iao,jao)*focc(jao) + focc(iao)*u_mo(jao,iao)
+               ddensitydr_mo(iao,jao) = ddensitydr_mo(iao,jao) + u_mo(iao,jao)*wfn%focc(jao,1) + wfn%focc(iao,1)*u_mo(iao,jao) !
             end do
             ! Occupation number derivative terms: P_mo^(1)_pp = n^(1)_p
-            ddensitydr_mo(iao,iao) = ddensitydr_mo(iao,iao) + dfocc(iao)
+            !ddensitydr_mo(iao,iao) = ddensitydr_mo(iao,iao) + dfocc(iao)
          end do
-
+         
          ! Transform the first derivative of the density matrix back to the AO basis: P^(1) = C x P_mo^(1) x C^T
          call gemm(amat=wfn%coeff(:,:,1),bmat=ddensitydr_mo(:,:),cmat=tmp,transa='N',transb='N')
          call gemm(amat=tmp,bmat=wfn%coeff(:,:,1),cmat=ddensitydr(ic,:,:),transa='N',transb='T')

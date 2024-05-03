@@ -25,7 +25,7 @@ module tblite_wavefunction_type
    private
 
    public :: new_wavefunction
-   public :: get_density_matrix, get_alpha_beta_occupation
+   public :: get_density_matrix, get_alpha_beta_occupation, deallocate_wavefunction
 
    !> Tight-binding wavefunction
    type, public :: wavefunction_type
@@ -65,6 +65,11 @@ module tblite_wavefunction_type
       !> Atomic quadrupole moments for each atom, shape: [5, nat, spin]
       real(wp), allocatable :: qpat(:, :, :)
 
+      !> Derivative of the density matrix w.r.t. the positions: [3, nao, nao, spin]
+      real(wp), allocatable :: ddensitydr(:, :, :, :)
+      !> Derivative of the density matrix  w.r.t. the lattice vectors: [3, nao, nao, spin]
+      real(wp), allocatable :: ddensitydL(:, :, :, :)
+
       !> Derivative of CEH chargs w.r.t. the positions: [3, nat, nsh]
       real(wp), allocatable :: dqdr(:, :, :)
       !> Derivative of CEH chargs w.r.t. the lattice vectors: [3, 3, nsh]
@@ -103,11 +108,18 @@ subroutine new_wavefunction(self, nat, nsh, nao, nspin, kt)
    allocate(self%dpat(3, nat, nspin))
    allocate(self%qpat(6, nat, nspin))
    
+   allocate(self%ddensitydr(3, nao, nao, nspin))
+   allocate(self%ddensitydL(3, nao, nao, nspin))
+
    allocate(self%dqdr(3, nat, nat))
    allocate(self%dqdL(3, 3, nat))
     
    self%dqdr(:, :, :) = 0.0_wp
    self%dqdL(:, :, :) = 0.0_wp
+   self%ddensitydr(:, :, :, :) = 0.0_wp
+   self%ddensitydL(:, :, :, :) = 0.0_wp
+   self%density(:, :, :) = 0.0_wp
+   self%coeff(:, :, :) = 0.0_wp
    self%qat(:, :) = 0.0_wp
    self%qsh(:, :) = 0.0_wp
    self%dpat(:, :, :) = 0.0_wp
@@ -155,6 +167,32 @@ subroutine get_alpha_beta_occupation(nocc, nuhf, nalp, nbet)
    nalp = ntmp / 2 + diff
    nbet = ntmp / 2
 end subroutine get_alpha_beta_occupation
+
+!> Delete wavefunction instance
+subroutine deallocate_wavefunction(self)
+   !> Instance of the wavefunction
+   type(wavefunction_type), intent(inout) :: self
+
+   if (allocated(self%homo)) deallocate(self%homo)
+   if (allocated(self%nel)) deallocate(self%nel)
+   if (allocated(self%n0at)) deallocate(self%n0at)
+   if (allocated(self%n0sh)) deallocate(self%n0sh)
+   if (allocated(self%density)) deallocate(self%density)
+   if (allocated(self%coeff)) deallocate(self%coeff)
+   if (allocated(self%emo)) deallocate(self%emo)
+   if (allocated(self%focc)) deallocate(self%focc)
+   if (allocated(self%qat)) deallocate(self%qat)
+   if (allocated(self%qsh)) deallocate(self%qsh)
+
+   if (allocated(self%dpat)) deallocate(self%dpat)
+   if (allocated(self%qpat)) deallocate(self%qpat)
+   if (allocated(self%ddensitydr)) deallocate(self%ddensitydr)
+   if (allocated(self%ddensitydL)) deallocate(self%ddensitydL)
+
+   if (allocated(self%dqdr)) deallocate(self%dqdr)
+   if (allocated(self%dqdL)) deallocate(self%dqdL)
+
+end subroutine deallocate_wavefunction
 
 
 end module tblite_wavefunction_type

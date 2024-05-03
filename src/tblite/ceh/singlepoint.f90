@@ -112,7 +112,7 @@ contains
       !> CEH matrix element derivative arrays: 
       real(wp), allocatable :: dh0dr(:,:,:), dh0dL(:,:,:), doverlap(:,:,:), doverlap_diat(:,:,:)
       !> CEH density matrix derivative: 
-      real(wp), allocatable :: ddensitydr(:,:,:,:), ddensitydL(:,:,:,:)
+      !real(wp), allocatable :: ddensitydr(:,:,:,:), ddensitydL(:,:,:,:)
 
       call timer%push("wall time CEH")
 
@@ -176,6 +176,10 @@ contains
       call get_hamiltonian(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
       & ints%overlap, ints%overlap_diat, ints%dipole, ints%hamiltonian)
 
+      ! call write_2d_matrix(ints%hamiltonian(:,:), "H in ceh_guess")
+      ! call write_2d_matrix(ints%overlap(:,:), "S in ceh_guess")
+      ! call write_2d_matrix(ints%overlap_diat(:,:), "Sdiat in ceh_guess")
+
       ! Get initial potential
       call new_potential(pot, mol, calc%bas, wfn%nspin)
       ! Set potential to zero
@@ -188,14 +192,19 @@ contains
       ! Add effective Hamiltonian to wavefunction
       call add_pot_to_h1(calc%bas, ints, pot, wfn%coeff)
 
+
+
       ! Solve the effective Hamiltonian
-      call ctx%new_solver(solver, calc%bas%nao)
+      call ctx%new_solver(solver, calc%bas%nao)   
 
       ! Get the density matrix
       call get_density(wfn, solver, ints, elec_entropy, error)
       if (allocated(error)) then
          call ctx%set_error(error)
       end if
+
+      !wfn%coeff(:,:,1) = ints%hamiltonian(:,:)
+      !call write_2d_matrix(wfn%coeff(:,:,1), "coeff finals ")
 
       ! Get charges and dipole moment from density and integrals
       call get_mulliken_shell_charges(calc%bas, ints%overlap, wfn%density, wfn%n0sh, &
@@ -213,29 +222,33 @@ contains
       call timer%push("wall time CEH gradient")
       if (grad) then
          allocate(dh0dr(3,calc%bas%nao,calc%bas%nao),&
-         & dh0dL(3,calc%bas%nao,calc%bas%nao),doverlap(3,calc%bas%nao,calc%bas%nao),doverlap_diat(3,calc%bas%nao,calc%bas%nao),&
-         & ddensitydr(3,calc%bas%nao,calc%bas%nao,1),ddensitydL(3,calc%bas%nao,calc%bas%nao,1))
-         dh0dr(:, :, :) = 0.0_wp
-         dh0dL(:, :, :) = 0.0_wp
-         doverlap(:, :, :) = 0.0_wp
+         & dh0dL(3,calc%bas%nao,calc%bas%nao),doverlap(3,calc%bas%nao,calc%bas%nao),doverlap_diat(3,calc%bas%nao,calc%bas%nao), &
+         & source = 0.0_wp) !,&
+         !& ddensitydr(3,calc%bas%nao,calc%bas%nao,1),ddensitydL(3,calc%bas%nao,calc%bas%nao,1))
+         
          ! Get the derivative of the Fock matrix elements
          call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
             & dsedr, dsedL, pot, wfn%density, dh0dr, dh0dL, doverlap, doverlap_diat)
+         
          ! Use the matrix element derivatives (F + S) to get the density matrix graidient
          ! based on the coupled-perturbed formalism
-         call get_density_matrix_gradient(mol,calc%bas,wfn,list,dh0dr,dh0dL,doverlap,ddensitydr(:,:,:,1),ddensitydL(:,:,:,1))
+         call get_density_matrix_gradient(mol,calc%bas,wfn,list,dh0dr,dh0dL,doverlap,&
+         & wfn%ddensitydr(:,:,:,1),wfn%ddensitydL(:,:,:,1))
 
          ! Derivative of the CEH Mulliken charges
-         call get_mulliken_atomic_charges_gradient(calc%bas, ints%overlap, wfn%density, &
-         & doverlap, ddensitydr, ddensitydL, wfn%dqdr, wfn%dqdL)
+         call get_mulliken_atomic_charges_gradient(calc%bas, mol, ints%overlap, wfn%density, &
+         & doverlap, wfn%ddensitydr, wfn%ddensitydL, wfn%dqdr, wfn%dqdL)
+         wfn%dqdr= 0.0_wp
+         wfn%dqdL = 0.0_wp
 
       end if 
+      
+      ! delete solver for numerical derivative 
+      call ctx%delete_solver(solver)
+
       call timer%pop()
 
-    end subroutine ceh_guess
-
-
-
+   end subroutine ceh_guess
 
   subroutine write_2d_matrix(matrix, name, unit, step)
     implicit none
