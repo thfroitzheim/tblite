@@ -913,6 +913,7 @@ contains
    subroutine new_ceh_calculator(calc,mol)
       !> Instance of the CEH evaluator
       type(xtb_calculator), intent(out) :: calc
+      !> Molecular structure data
       type(structure_type), intent(in)  :: mol
 
       call add_ceh_basis(calc, mol)
@@ -1077,6 +1078,7 @@ contains
             selfenergy(ish, isp) = p_ceh_selfenergy(ish, izp)
          end do
       end do
+      
    end subroutine get_selfenergy
 
 
