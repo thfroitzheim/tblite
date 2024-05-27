@@ -70,26 +70,28 @@ contains
          new_unittest("scaled-selfenergy-S2", test_scaled_selfenergy_s2), &
          new_unittest("scaled-selfenergy-SiH4", test_scaled_selfenergy_sih4), &
          new_unittest("scaled-selfenergy-AcCl6", test_scaled_selfenergy_accl6), &
-         !new_unittest("scaled-selfenergy_grad-H2", test_scaled_selfenergy_numgrad_h2), &
-         !new_unittest("scaled-selfenergy_grad-LiH", test_scaled_selfenergy_numgrad_lih), &
-         !new_unittest("scaled-selfenergy_grad-S2", test_scaled_selfenergy_numgrad_s2), &
-         !new_unittest("scaled-selfenergy_grad-SiH4", test_scaled_selfenergy_numgrad_sih4), &
+         new_unittest("scaled-selfenergy_grad-H2", test_scaled_selfenergy_grad_h2), &
+         new_unittest("scaled-selfenergy_grad-LiH", test_scaled_selfenergy_grad_lih), &
+         new_unittest("scaled-selfenergy_grad-S2", test_scaled_selfenergy_grad_s2), &
+         new_unittest("scaled-selfenergy_grad-SiH4", test_scaled_selfenergy_grad_sih4), &
+         new_unittest("scaled-selfenergy_grad-AcCl6", test_scaled_selfenergy_grad_accl6), &
          new_unittest("hamiltonian-H2", test_hamiltonian_h2), &
          new_unittest("hamiltonian-LiH", test_hamiltonian_lih), &
          new_unittest("hamiltonian-S2", test_hamiltonian_s2), &
          new_unittest("hamiltonian-SiH4", test_hamiltonian_sih4), &
-         !new_unittest("hamiltonian_grad-H2", test_hamiltonian_numgrad_h2), &
-         !new_unittest("hamiltonian_grad-LiH", test_hamiltonian_numgrad_lih), &
-         !new_unittest("hamiltonian_grad-S2", test_hamiltonian_numgrad_s2), &
-         !new_unittest("hamiltonian_grad-PCl", test_hamiltonian_numgrad_pcl), &
-         !new_unittest("hamiltonian_grad-SiH4", test_hamiltonian_numgrad_sih4), &
-         !new_unittest("hamiltonian_grad-CeCl3", test_hamiltonian_numgrad_cecl3), &
-         !new_unittest("density_grad-H2", test_density_numgrad_h2), &
-         !new_unittest("density_grad-LiH", test_density_numgrad_lih) &
-         !new_unittest("density_grad-S2", test_density_numgrad_s2), &
-         !new_unittest("density_grad-PCl", test_density_numgrad_pcl) &
-         ! new_unittest("density_grad-SiH4", test_density_numgrad_sih4) &
-         ! new_unittest("density_grad-CeCl3", test_density_numgrad_cecl3) &
+         new_unittest("hamiltonian_grad-H2", test_hamiltonian_grad_h2), &
+         new_unittest("hamiltonian_grad-LiH", test_hamiltonian_grad_lih), &
+         new_unittest("hamiltonian_grad-S2", test_hamiltonian_grad_s2), &
+         new_unittest("hamiltonian_grad-PCl", test_hamiltonian_grad_pcl), &
+         new_unittest("hamiltonian_grad-SiH4", test_hamiltonian_grad_sih4), &
+         new_unittest("hamiltonian_grad-CeCl3", test_hamiltonian_grad_cecl3), &
+         new_unittest("hamiltonian_grad-AcCl6", test_hamiltonian_grad_accl6), &
+         !new_unittest("density_grad-H2", test_density_grad_h2), &
+         !new_unittest("density_grad-LiH", test_density_grad_lih) &
+         !new_unittest("density_grad-S2", test_density_grad_s2), &
+         !new_unittest("density_grad-PCl", test_density_grad_pcl) &
+         !new_unittest("density_grad-SiH4", test_density_grad_sih4) &
+         !new_unittest("density_grad-CeCl3", test_density_grad_cecl3) &
          new_unittest("overlap_diat-H2", test_overlap_diat_h2), &
          new_unittest("overlap_diat-LiH", test_overlap_diat_lih), &
          new_unittest("overlap_diat-S2", test_overlap_diat_s2), &
@@ -352,7 +354,7 @@ contains
    end subroutine test_scaled_selfenergy_mol
 
 
-   subroutine test_scaled_selfenergy_grad_mol(error, mol)
+   subroutine test_scaled_selfenergy_numgrad_mol(error, mol)
 
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -722,7 +724,7 @@ contains
          
          do ii = 1, size(numdr,2)
             do jj = 1, size(numdr,3)
-               call check(error, numdr(ic, ii, jj), dh0dr(ic, ii, jj), thr=thr2)
+               call check(error, numdr(ic, ii, jj), doverlap_diat(ic, ii, jj), thr=thr2)
                if (allocated(error)) then 
                   call test_failed(error, "Hamiltonian derivative does not match")
                   !exit num
