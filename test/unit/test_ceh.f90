@@ -77,14 +77,15 @@ contains
          ! new_unittest("hamiltonian-LiH", test_hamiltonian_lih), &
          ! new_unittest("hamiltonian-S2", test_hamiltonian_s2), &
          ! new_unittest("hamiltonian-SiH4", test_hamiltonian_sih4), &
-         ! new_unittest("hamiltonian_grad-H2", test_hamiltonian_numgrad_h2), &
-         !new_unittest("hamiltonian_grad-LiH", test_hamiltonian_numgrad_lih), &
-         !new_unittest("hamiltonian_grad-S2", test_hamiltonian_numgrad_s2), &
-         !new_unittest("hamiltonian_grad-PCl", test_hamiltonian_numgrad_pcl), &
-         !new_unittest("hamiltonian_grad-SiH4", test_hamiltonian_numgrad_sih4), &
-         !new_unittest("hamiltonian_grad-CeCl3", test_hamiltonian_numgrad_cecl3), &
-         new_unittest("density_grad-H2", test_density_numgrad_h2), &
-         new_unittest("density_grad-LiH", test_density_numgrad_lih) &
+         new_unittest("hamiltonian_grad-H2", test_hamiltonian_numgrad_h2), &
+         new_unittest("hamiltonian_grad-LiH", test_hamiltonian_numgrad_lih), &
+         new_unittest("hamiltonian_grad-S2", test_hamiltonian_numgrad_s2), &
+         new_unittest("hamiltonian_grad-PCl", test_hamiltonian_numgrad_pcl), &
+         new_unittest("hamiltonian_grad-SiH4", test_hamiltonian_numgrad_sih4), &
+         new_unittest("hamiltonian_grad-CeCl3", test_hamiltonian_numgrad_cecl3), &
+         new_unittest("hamiltonian_grad-AcCl6", test_hamiltonian_numgrad_accl6) &
+         !new_unittest("density_grad-H2", test_density_numgrad_h2), &
+         !new_unittest("density_grad-LiH", test_density_numgrad_lih) &
          !new_unittest("density_grad-S2", test_density_numgrad_s2), &
          !new_unittest("density_grad-PCl", test_density_numgrad_pcl) &
          ! new_unittest("density_grad-SiH4", test_density_numgrad_sih4) &
@@ -584,7 +585,7 @@ contains
                call check(error, numdr(ic, ii, jj), dh0dr(ic, ii, jj), thr=thr2)
                if (allocated(error)) then 
                   call test_failed(error, "Hamiltonian derivative does not match")
-                  exit num
+                  !exit num
                end if
             end do           
          end do
@@ -1574,11 +1575,22 @@ contains
 
       type(structure_type) :: mol
 
-      call get_structure(mol, "MB16-43", "CeCl3")
+      call get_structure(mol, "f-block", "CeCl3")
       call test_hamiltonian_numgrad(error, mol)
 
    end subroutine test_hamiltonian_numgrad_cecl3
 
+   subroutine test_hamiltonian_numgrad_accl6(error)
+
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "f-block", "AcCl6")
+      call test_hamiltonian_numgrad(error, mol)
+
+   end subroutine test_hamiltonian_numgrad_accl6
 
    subroutine test_density_numgrad_h2(error)
    

@@ -396,7 +396,7 @@ contains
 
       ! Prepare sperical coordinate derivative
       ! In the case of vec || z-axis, the phi derivative vanishes.
-      if(norm_vec(1)**2 + norm_vec(2)**2 .lt. eps) then
+      if(norm_vec(1)**2 + norm_vec(2)**2 .eq. 0.0_wp) then
          dpdx = 0.0_wp
          dpdy = 0.0_wp
       else

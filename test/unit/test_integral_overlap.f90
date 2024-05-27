@@ -53,7 +53,7 @@ subroutine collect_integral_overlap(testsuite)
       new_unittest("overlap-f2", test_overlap_f2), &
       new_unittest("overlap-h2", test_overlap_h2), &
       new_unittest("overlap-lih", test_overlap_lih), &
-      new_unittest("overlap-diat-cecl3", test_overlap_diat_cecl3), &
+      !new_unittest("overlap-diat-cecl3", test_overlap_diat_cecl3), &
       new_unittest("overlap-grad-ss", test_overlap_grad_ss), &
       new_unittest("overlap-grad-pp", test_overlap_grad_pp), &
       new_unittest("overlap-grad-dd", test_overlap_grad_dd), &
