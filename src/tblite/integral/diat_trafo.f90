@@ -31,7 +31,8 @@ module tblite_integral_diat_trafo
 contains
 
    !> Transformation to the diatomic frame and back: 
-   pure subroutine diat_trafo(block_overlap, vec, ksig, kpi, kdel, maxl)
+   !pure 
+   subroutine diat_trafo(block_overlap, vec, ksig, kpi, kdel, maxl)
       !> Diatomic block of CGTOs to be transformed (+ scaled)
       real(wp),intent(inout)    :: block_overlap(:,:)
       !> Transformation vector for the diatomic frame (i.e. vector between the two centers)
@@ -74,7 +75,8 @@ contains
    end subroutine diat_trafo
 
    !> Gradient of the diatomic frame scaled overlap transformation: 
-   pure subroutine diat_trafo_grad(block_overlap, block_doverlap, vec, ksig, kpi, kdel, maxl)
+   !pure 
+   subroutine diat_trafo_grad(block_overlap, block_doverlap, vec, ksig, kpi, kdel, maxl)
       !> Diatomic block of CGTO overlap to be transformed (+ scaled)
       real(wp),intent(inout)    :: block_overlap(:,:)
       !> Derivative of diatomic block of CGTO overlap to be transformed (+ scaled)
@@ -170,7 +172,8 @@ contains
    end subroutine diat_trafo_grad
 
 
-   pure subroutine harmtr(maxl,vec,trafomat)
+   !pure 
+   subroutine harmtr(maxl,vec,trafomat)
       !> Maximum angular momentum
       integer, intent(in)  :: maxl
       !> Normalized vector from atom k to atom l
@@ -274,7 +277,7 @@ contains
       trafomat(6,5) = -SINT*COSP
       trafomat(9,5) = -COST*SIN2P
       trafomat(5,5) = COST*COS2P
-
+      
       if ( maxl <= 2 ) return
 
       ! -------------------------------
@@ -311,7 +314,8 @@ contains
 
    end subroutine harmtr
 
-   pure subroutine d_harmtr(maxl,vec,trafomat, dtrafomat)
+   !pure 
+   subroutine d_harmtr(maxl,vec,trafomat, dtrafomat)
       !> Maximum angular momentum
       integer, intent(in)  :: maxl
       !> Normalized vector from atom k to atom l
@@ -479,7 +483,7 @@ contains
       trafomat_dpy(4,2) = -COSPY
       trafomat_dpy(2,2) = -SINPY
       trafomat_dpy(3,2) = 0.0_wp
-           
+      
 
       if ( maxl <= 1 ) then 
          dtrafomat(1, 1:4, 1:4) = dpdx * trafomat_dp(1:4, 1:4) + dtdx * trafomat_dt(1:4, 1:4) 
@@ -679,7 +683,7 @@ contains
          ! Transform to cartesian coordinates
          dtrafomat(1, 1:9, 1:9) = dpdx * trafomat_dp(1:9, 1:9) + dtdx * trafomat_dt(1:9, 1:9)
          dtrafomat(2, 1:9, 1:9) = dpdy * trafomat_dpy(1:9, 1:9) + dtdy * trafomat_dty(1:9, 1:9)
-         dtrafomat(3, 1:9, 1:9) = dtdz * trafomat_dt(1:9, 1:9)
+         dtrafomat(3, 1:9, 1:9) = dtdz * trafomat_dt(1:9, 1:9)   
          return
       end if
 

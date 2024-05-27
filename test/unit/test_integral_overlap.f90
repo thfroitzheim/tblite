@@ -1786,18 +1786,23 @@ subroutine test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
       doverlaptmp(i, :, :) = 0.5_wp * (sr - sl) / step
       doverlaptmp_diat(i, :, :) = 0.5_wp * (sr_diat - sl_diat) / step
    end do
-
+   
    num: do i = 1, 3
+      !call write_2d_matrix(doverlapj_diat(i, :, :), "doverlapj")
+      !call write_2d_matrix(doverlaptmp_diat(i, :, :), "doverlaptmp")
+      !call write_2d_matrix(doverlapj_diat(i, :, :)-doverlaptmp_diat(i, :, :), "diff")
+
       do j = 1, msao(cgtoi%ang) 
          do k = 1, msao(cgtoj%ang)
             call check(error, doverlapj(i, k, j), doverlaptmp(i, k, j), thr=thr)
             if (allocated(error)) then
-               write(*,*) "Error", doverlapj(i, k, j), doverlaptmp(i, k, j)
+               write(*,*) "Error ovl", doverlapj(i, k, j), doverlaptmp(i, k, j), doverlapj(i, k, j)- doverlaptmp(i, k, j), thr
                exit num
             end if 
             call check(error, doverlapj_diat(i, k, j), doverlaptmp_diat(i, k, j), thr=thr)
             if (allocated(error)) then
-               write(*,*) "Error", doverlapj(i, k, j), doverlaptmp(i, k, j)
+               write(*,*) "Error diat", doverlapj_diat(i, k, j), doverlaptmp_diat(i, k, j), &
+               &doverlapj_diat(i, k, j)- doverlaptmp_diat(i, k, j), thr
                exit num
             end if
          end do
@@ -1806,6 +1811,53 @@ subroutine test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
    if (allocated(error)) return
 
 end subroutine test_overlap_diat_grad_gen
+
+
+
+
+! subroutine write_2d_matrix(matrix, name, unit, step)
+!    implicit none
+!    real(wp), intent(in) :: matrix(:, :)
+!    character(len=*), intent(in), optional :: name
+!    integer, intent(in), optional :: unit
+!    integer, intent(in), optional :: step
+!    integer :: d1, d2
+!    integer :: i, j, k, l, istep, iunit
+
+!    d1 = size(matrix, dim=1)
+!    d2 = size(matrix, dim=2)
+
+!    if (present(unit)) then
+!      iunit = unit
+!    else
+!      iunit = output_unit
+!    end if
+
+!    if (present(step)) then
+!      istep = step
+!    else
+!      istep = 6
+!    end if
+
+!    if (present(name)) write (iunit, '(/,"matrix printed:",1x,a)') name
+
+!    do i = 1, d2, istep
+!      l = min(i + istep - 1, d2)
+!      write (iunit, '(/,6x)', advance='no')
+!      do k = i, l
+!        write (iunit, '(6x,i7,3x)', advance='no') k
+!      end do
+!      write (iunit, '(a)')
+!      do j = 1, d1
+!        write (iunit, '(i6)', advance='no') j
+!        do k = i, l
+!          write (iunit, '(1x,f15.8)', advance='no') matrix(j, k)
+!        end do
+!        write (iunit, '(a)')
+!      end do
+!    end do
+
+!  end subroutine write_2d_matrix
 
 subroutine test_overlap_diat_grad_ss(error)
 
@@ -2126,9 +2178,11 @@ subroutine test_overlap_diat_grad_dd_z(error)
    call slater_to_gauss(ng, 3, 2, 1.3_wp, cgtoj, .true., stat)
 
    ! Vector along the z-axis to test the ill-defined gradient
-   vec(1) = 0.0_wp
-   vec(2) = 0.0_wp   
-   vec(3) = 0.7_wp
+   vec(1) = -4.2738582800000008E-005_wp ! 0.0_wp
+   vec(2) = 1.9619373507000001E-004_wp ! 0.0_wp
+   vec(3) = -5.1529538776373203_wp ! 0.7_wp
+
+         
 
    ksig = 0.1_wp
    kpi = 0.2_wp

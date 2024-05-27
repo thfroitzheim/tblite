@@ -338,7 +338,8 @@ pure subroutine overlap_cgto(cgtoj, cgtoi, r2, vec, intcut, overlap)
 
 end subroutine overlap_cgto
 
-pure subroutine overlap_cgto_diat(cgtoj, cgtoi, r2, vec, intcut, & 
+!pure 
+subroutine overlap_cgto_diat(cgtoj, cgtoi, r2, vec, intcut, & 
 & ksig, kpi, kdel, overlap, overlap_diat)
    !> Description of contracted Gaussian function on center i
    type(cgto_type), intent(in) :: cgtoi
@@ -469,7 +470,8 @@ pure subroutine overlap_grad_cgto(cgtoj, cgtoi, r2, vec, intcut, overlap, doverl
 end subroutine overlap_grad_cgto
 
 
-pure subroutine overlap_grad_cgto_diat(cgtoj, cgtoi, r2, vec, intcut, &
+!pure 
+subroutine overlap_grad_cgto_diat(cgtoj, cgtoi, r2, vec, intcut, &
 &  ksig, kpi, kdel, overlap, doverlap, overlap_diat, doverlap_diat)
    !> Description of contracted Gaussian function on center j
    type(cgto_type), intent(in) :: cgtoj

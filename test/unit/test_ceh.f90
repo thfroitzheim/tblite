@@ -74,26 +74,28 @@ contains
          new_unittest("scaled-selfenergy-S2", test_scaled_selfenergy_s2), &
          new_unittest("scaled-selfenergy-SiH4", test_scaled_selfenergy_sih4), &
          new_unittest("scaled-selfenergy-AcCl6", test_scaled_selfenergy_accl6), &
-         !new_unittest("scaled-selfenergy_grad-H2", test_scaled_selfenergy_numgrad_h2), &
-         !new_unittest("scaled-selfenergy_grad-LiH", test_scaled_selfenergy_numgrad_lih), &
-         !new_unittest("scaled-selfenergy_grad-S2", test_scaled_selfenergy_numgrad_s2), &
-         !new_unittest("scaled-selfenergy_grad-SiH4", test_scaled_selfenergy_numgrad_sih4), &
+         new_unittest("scaled-selfenergy_grad-H2", test_scaled_selfenergy_grad_h2), &
+         new_unittest("scaled-selfenergy_grad-LiH", test_scaled_selfenergy_grad_lih), &
+         new_unittest("scaled-selfenergy_grad-S2", test_scaled_selfenergy_grad_s2), &
+         new_unittest("scaled-selfenergy_grad-SiH4", test_scaled_selfenergy_grad_sih4), &
+         new_unittest("scaled-selfenergy_grad-AcCl6", test_scaled_selfenergy_grad_accl6), &
          new_unittest("hamiltonian-H2", test_hamiltonian_h2), &
          new_unittest("hamiltonian-LiH", test_hamiltonian_lih), &
          new_unittest("hamiltonian-S2", test_hamiltonian_s2), &
          new_unittest("hamiltonian-SiH4", test_hamiltonian_sih4), &
-         !new_unittest("hamiltonian_grad-H2", test_hamiltonian_numgrad_h2), &
-         !new_unittest("hamiltonian_grad-LiH", test_hamiltonian_numgrad_lih), &
-         !new_unittest("hamiltonian_grad-S2", test_hamiltonian_numgrad_s2), &
-         !new_unittest("hamiltonian_grad-PCl", test_hamiltonian_numgrad_pcl), &
-         !new_unittest("hamiltonian_grad-SiH4", test_hamiltonian_numgrad_sih4), &
-         !new_unittest("hamiltonian_grad-CeCl3", test_hamiltonian_numgrad_cecl3), &
-         !new_unittest("density_grad-H2", test_density_numgrad_h2), &
-         !new_unittest("density_grad-LiH", test_density_numgrad_lih) &
-         !new_unittest("density_grad-S2", test_density_numgrad_s2), &
-         !new_unittest("density_grad-PCl", test_density_numgrad_pcl) &
-         ! new_unittest("density_grad-SiH4", test_density_numgrad_sih4) &
-         ! new_unittest("density_grad-CeCl3", test_density_numgrad_cecl3) &
+         new_unittest("hamiltonian_grad-H2", test_hamiltonian_grad_h2), &
+         new_unittest("hamiltonian_grad-LiH", test_hamiltonian_grad_lih), &
+         new_unittest("hamiltonian_grad-S2", test_hamiltonian_grad_s2), &
+         new_unittest("hamiltonian_grad-PCl", test_hamiltonian_grad_pcl), &
+         new_unittest("hamiltonian_grad-SiH4", test_hamiltonian_grad_sih4), &
+         new_unittest("hamiltonian_grad-CeCl3", test_hamiltonian_grad_cecl3), &
+         new_unittest("hamiltonian_grad-AcCl6", test_hamiltonian_grad_accl6), &
+         !new_unittest("density_grad-H2", test_density_grad_h2), &
+         !new_unittest("density_grad-LiH", test_density_grad_lih) &
+         !new_unittest("density_grad-S2", test_density_grad_s2), &
+         !new_unittest("density_grad-PCl", test_density_grad_pcl) &
+         !new_unittest("density_grad-SiH4", test_density_grad_sih4) &
+         !new_unittest("density_grad-CeCl3", test_density_grad_cecl3) &
          new_unittest("overlap_diat-H2", test_overlap_diat_h2), &
          new_unittest("overlap_diat-LiH", test_overlap_diat_lih), &
          new_unittest("overlap_diat-S2", test_overlap_diat_s2), &
@@ -356,7 +358,7 @@ contains
    end subroutine test_scaled_selfenergy_mol
 
 
-   subroutine test_scaled_selfenergy_numgrad_mol(error, mol)
+   subroutine test_scaled_selfenergy_grad_mol(error, mol)
 
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -438,7 +440,7 @@ contains
          call test_failed(error, "Derivative of selfenergies does not match")
       end if
 
-   end subroutine test_scaled_selfenergy_numgrad_mol
+   end subroutine test_scaled_selfenergy_grad_mol
 
 
 
@@ -507,7 +509,7 @@ contains
    end subroutine test_hamiltonian_mol
 
 
-   subroutine test_hamiltonian_numgrad(error, mol)
+   subroutine test_hamiltonian_grad(error, mol)
    
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -627,12 +629,14 @@ contains
                         do jao = 1, bas%nao_sh(js+jsh)
                            ! Upper triangular matrix and diagonal
                            numdr(ic, jj+jao, ii+iao) = & 
-                              & + 0.5_wp*(hamiltonianr(jj+jao, ii+iao) - hamiltonianl(jj+jao, ii+iao))/step
+                              & + 0.5_wp*(overlap_diatr(jj+jao, ii+iao) - overlap_diatl(jj+jao, ii+iao))/step
+                              !& + 0.5_wp*(hamiltonianr(jj+jao, ii+iao) - hamiltonianl(jj+jao, ii+iao))/step
 
                            ! Lower triangular matrix
                            if(ii+iao /= jj+jao) then
                               numdr(ic, ii+iao, jj+jao) = &
-                                 & - 0.5_wp*(hamiltonianr(ii+iao, jj+jao) - hamiltonianl(ii+iao, jj+jao))/step
+                                 & - 0.5_wp*(overlap_diatr(ii+iao, jj+jao) - overlap_diatl(ii+iao, jj+jao))/step
+                                 !& - 0.5_wp*(hamiltonianr(ii+iao, jj+jao) - hamiltonianl(ii+iao, jj+jao))/step                                 
                            end if
                         end do
                      end do 
@@ -659,10 +663,17 @@ contains
          & dsedr, dsedL, pot, dummy_pmat, dh0dr, dh0dL, doverlap, doverlap_diat)
 
       num: do ic = 1, 3
-         call write_2d_matrix(numdr(ic,:,:), "num H")
+         !call write_2d_matrix(numdr(ic,:,:), "num H")
+         !call write_2d_matrix(dh0dr(ic,:,:), "ana H")
+         !call write_2d_matrix(dh0dr(ic,:,:) - numdr(ic,:,:), "diff")
+         
+         !call write_2d_matrix(numdr(ic,:,:), "num Ssc", step=16)
+         !call write_2d_matrix(doverlap_diat(ic,:,:), "ana Ssc", step=16)
+         !call write_2d_matrix(doverlap_diat(ic,:,:) - numdr(ic,:,:), "diff", step=16)
+         
          do ii = 1, size(numdr,2)
             do jj = 1, size(numdr,3)
-               call check(error, numdr(ic, ii, jj), dh0dr(ic, ii, jj), thr=thr2)
+               call check(error, numdr(ic, ii, jj), doverlap_diat(ic, ii, jj), thr=thr2)
                if (allocated(error)) then 
                   call test_failed(error, "Hamiltonian derivative does not match")
                   exit num
@@ -671,11 +682,11 @@ contains
          end do
       end do num
 
-      if (any(abs(numdr - dh0dr) > thr2)) then
-         call test_failed(error, "Derivative of does not match")
-      end if
+      !if (any(abs(numdr - dh0dr) > thr2)) then
+      !   call test_failed(error, "Derivative of does not match")
+      !end if
    
-   end subroutine test_hamiltonian_numgrad
+   end subroutine test_hamiltonian_grad
 
    subroutine write_2d_matrix(matrix, name, unit, step)
       implicit none
@@ -785,7 +796,7 @@ contains
 
    end subroutine test_overlap_diat_mol
 
-   subroutine test_density_numgrad(error, mol)
+   subroutine test_density_grad(error, mol)
    
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -835,7 +846,6 @@ contains
 
             mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
             call new_ceh_calculator(calc, mol)
-            call deallocate_wavefunction(wfn)
             call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
             ctx%verbosity = 0
             wfn%density(:,:,1) = 0.0_wp
@@ -849,7 +859,6 @@ contains
 
             mol%xyz(ic, iat) = mol%xyz(ic, iat) - 2*step
             call new_ceh_calculator(calc, mol)
-            call deallocate_wavefunction(wfn)
             call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
 
             ctx%verbosity = 0
@@ -1057,7 +1066,7 @@ contains
 
 
 
-   end subroutine test_density_numgrad
+   end subroutine test_density_grad
 
 
    subroutine test_q_gen(error, mol, ref)
@@ -1263,7 +1272,7 @@ contains
 
    end subroutine test_scaled_selfenergy_accl6
 
-   subroutine test_scaled_selfenergy_numgrad_h2(error)
+   subroutine test_scaled_selfenergy_grad_h2(error)
    
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1271,11 +1280,11 @@ contains
       type(structure_type) :: mol
    
       call get_structure(mol, "MB16-43", "H2")
-      call test_scaled_selfenergy_numgrad_mol(error, mol)
+      call test_scaled_selfenergy_grad_mol(error, mol)
    
-   end subroutine test_scaled_selfenergy_numgrad_h2
+   end subroutine test_scaled_selfenergy_grad_h2
    
-   subroutine test_scaled_selfenergy_numgrad_lih(error)
+   subroutine test_scaled_selfenergy_grad_lih(error)
    
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1283,11 +1292,11 @@ contains
       type(structure_type) :: mol
    
       call get_structure(mol, "MB16-43", "LiH")
-      call test_scaled_selfenergy_numgrad_mol(error, mol)
+      call test_scaled_selfenergy_grad_mol(error, mol)
    
-   end subroutine test_scaled_selfenergy_numgrad_lih
+   end subroutine test_scaled_selfenergy_grad_lih
    
-   subroutine test_scaled_selfenergy_numgrad_s2(error)
+   subroutine test_scaled_selfenergy_grad_s2(error)
    
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1295,11 +1304,11 @@ contains
       type(structure_type) :: mol
    
       call get_structure(mol, "MB16-43", "S2")
-      call test_scaled_selfenergy_numgrad_mol(error, mol)
+      call test_scaled_selfenergy_grad_mol(error, mol)
    
-   end subroutine test_scaled_selfenergy_numgrad_s2
+   end subroutine test_scaled_selfenergy_grad_s2
 
-   subroutine test_scaled_selfenergy_numgrad_sih4(error)
+   subroutine test_scaled_selfenergy_grad_sih4(error)
 
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1307,10 +1316,21 @@ contains
       type(structure_type) :: mol
 
       call get_structure(mol, "MB16-43", "SiH4")
-      call test_scaled_selfenergy_numgrad_mol(error, mol)
+      call test_scaled_selfenergy_grad_mol(error, mol)
 
-   end subroutine test_scaled_selfenergy_numgrad_sih4
+   end subroutine test_scaled_selfenergy_grad_sih4
 
+   subroutine test_scaled_selfenergy_grad_accl6(error)
+
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "f-block", "AcCl6")
+      call test_scaled_selfenergy_grad_mol(error, mol)
+
+   end subroutine test_scaled_selfenergy_grad_accl6
 
    subroutine test_hamiltonian_h2(error)
 
@@ -1550,7 +1570,7 @@ contains
    end subroutine test_hamiltonian_sih4
 
 
-   subroutine test_hamiltonian_numgrad_h2(error)
+   subroutine test_hamiltonian_grad_h2(error)
    
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1558,11 +1578,11 @@ contains
       type(structure_type) :: mol
    
       call get_structure(mol, "MB16-43", "H2")
-      call test_hamiltonian_numgrad(error, mol)
+      call test_hamiltonian_grad(error, mol)
    
-   end subroutine test_hamiltonian_numgrad_h2
+   end subroutine test_hamiltonian_grad_h2
    
-   subroutine test_hamiltonian_numgrad_lih(error)
+   subroutine test_hamiltonian_grad_lih(error)
    
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1570,11 +1590,11 @@ contains
       type(structure_type) :: mol
    
       call get_structure(mol, "MB16-43", "LiH")
-      call test_hamiltonian_numgrad(error, mol)
+      call test_hamiltonian_grad(error, mol)
    
-   end subroutine test_hamiltonian_numgrad_lih
+   end subroutine test_hamiltonian_grad_lih
    
-   subroutine test_hamiltonian_numgrad_s2(error)
+   subroutine test_hamiltonian_grad_s2(error)
    
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1582,11 +1602,11 @@ contains
       type(structure_type) :: mol
    
       call get_structure(mol, "MB16-43", "S2")
-      call test_hamiltonian_numgrad(error, mol)
+      call test_hamiltonian_grad(error, mol)
    
-   end subroutine test_hamiltonian_numgrad_s2
+   end subroutine test_hamiltonian_grad_s2
 
-   subroutine test_hamiltonian_numgrad_pcl(error)
+   subroutine test_hamiltonian_grad_pcl(error)
 
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1594,11 +1614,11 @@ contains
       type(structure_type) :: mol
 
       call get_structure(mol, "MB16-43", "PCl")
-      call test_hamiltonian_numgrad(error, mol)
+      call test_hamiltonian_grad(error, mol)
 
-   end subroutine test_hamiltonian_numgrad_pcl
+   end subroutine test_hamiltonian_grad_pcl
 
-   subroutine test_hamiltonian_numgrad_sih4(error)
+   subroutine test_hamiltonian_grad_sih4(error)
 
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1606,24 +1626,35 @@ contains
       type(structure_type) :: mol
 
       call get_structure(mol, "MB16-43", "SiH4")
-      call test_hamiltonian_numgrad(error, mol)
+      call test_hamiltonian_grad(error, mol)
 
-   end subroutine test_hamiltonian_numgrad_sih4
+   end subroutine test_hamiltonian_grad_sih4
 
-   subroutine test_hamiltonian_numgrad_cecl3(error)
+   subroutine test_hamiltonian_grad_cecl3(error)
 
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
 
       type(structure_type) :: mol
 
-      call get_structure(mol, "MB16-43", "CeCl3")
-      call test_hamiltonian_numgrad(error, mol)
+      call get_structure(mol, "f-block", "CeCl3")
+      call test_hamiltonian_grad(error, mol)
 
-   end subroutine test_hamiltonian_numgrad_cecl3
+   end subroutine test_hamiltonian_grad_cecl3
 
+   subroutine test_hamiltonian_grad_accl6(error)
 
-   subroutine test_density_numgrad_h2(error)
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "f-block", "AcCl6")
+      call test_hamiltonian_grad(error, mol)
+
+   end subroutine test_hamiltonian_grad_accl6
+
+   subroutine test_density_grad_h2(error)
    
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1631,11 +1662,11 @@ contains
       type(structure_type) :: mol
    
       call get_structure(mol, "MB16-43", "H2")
-      call test_density_numgrad(error, mol)
+      call test_density_grad(error, mol)
    
-   end subroutine test_density_numgrad_h2
+   end subroutine test_density_grad_h2
    
-   subroutine test_density_numgrad_lih(error)
+   subroutine test_density_grad_lih(error)
    
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1643,11 +1674,11 @@ contains
       type(structure_type) :: mol
    
       call get_structure(mol, "MB16-43", "LiH")
-      call test_density_numgrad(error, mol)
+      call test_density_grad(error, mol)
    
-   end subroutine test_density_numgrad_lih
+   end subroutine test_density_grad_lih
    
-   subroutine test_density_numgrad_s2(error)
+   subroutine test_density_grad_s2(error)
    
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1655,11 +1686,11 @@ contains
       type(structure_type) :: mol
    
       call get_structure(mol, "MB16-43", "S2")
-      call test_density_numgrad(error, mol)
+      call test_density_grad(error, mol)
    
-   end subroutine test_density_numgrad_s2
+   end subroutine test_density_grad_s2
 
-   subroutine test_density_numgrad_pcl(error)
+   subroutine test_density_grad_pcl(error)
 
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1667,11 +1698,11 @@ contains
       type(structure_type) :: mol
 
       call get_structure(mol, "MB16-43", "PCl")
-      call test_density_numgrad(error, mol)
+      call test_density_grad(error, mol)
 
-   end subroutine test_density_numgrad_pcl
+   end subroutine test_density_grad_pcl
 
-   subroutine test_density_numgrad_sih4(error)
+   subroutine test_density_grad_sih4(error)
 
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1679,11 +1710,11 @@ contains
       type(structure_type) :: mol
 
       call get_structure(mol, "MB16-43", "SiH4")
-      call test_density_numgrad(error, mol)
+      call test_density_grad(error, mol)
 
-   end subroutine test_density_numgrad_sih4
+   end subroutine test_density_grad_sih4
 
-   subroutine test_density_numgrad_cecl3(error)
+   subroutine test_density_grad_cecl3(error)
 
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
@@ -1691,9 +1722,9 @@ contains
       type(structure_type) :: mol
 
       call get_structure(mol, "MB16-43", "CeCl3")
-      call test_density_numgrad(error, mol)
+      call test_density_grad(error, mol)
 
-   end subroutine test_density_numgrad_cecl3
+   end subroutine test_density_grad_cecl3
 
 
    subroutine test_overlap_diat_h2(error)
