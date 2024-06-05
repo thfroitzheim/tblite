@@ -45,7 +45,7 @@ jobs:
           build: meson
           build-type: debug
           compiler: gnu
-          version: 9
+          version: 11
 
         - os: ubuntu-latest
           build: meson
@@ -83,8 +83,8 @@ jobs:
 
     env:
       GCC_V: ${{ matrix.version }}
-      FC: ${{ matrix.compiler == 'intel' && 'ifort' || 'gfortran-9' }}
-      CC: ${{ matrix.compiler == 'intel' && 'icc' || 'gcc-9'}}
+      FC: ${{ matrix.compiler == 'intel' && 'ifort' || 'gfortran' }}
+      CC: ${{ matrix.compiler == 'intel' && 'icc' || 'gcc'}}
       PYTHON_V: 3.8
 
     steps:
