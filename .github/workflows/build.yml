@@ -329,7 +329,7 @@ jobs:
         python_v: ['3.7', '3.8', '3.9']
 
         include:
-        - os: macos-latest
+        - os: macos-13
           gcc_v: 10
           python_v: '3.9'
 
