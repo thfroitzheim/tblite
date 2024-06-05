@@ -45,7 +45,7 @@ jobs:
           build: meson
           build-type: debug
           compiler: gnu
-          version: 10
+          version: 11
 
         - os: ubuntu-latest
           build: meson
@@ -57,7 +57,7 @@ jobs:
           build: cmake
           build-type: debug
           compiler: gnu
-          version: 10
+          version: 11
 
         - os: ubuntu-latest
           build: meson
