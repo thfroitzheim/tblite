@@ -169,7 +169,7 @@ subroutine get_alpha_beta_occupation(nocc, nuhf, nalp, nbet)
    nbet = ntmp / 2
 end subroutine get_alpha_beta_occupation
 
-!> Split atomic charges into shell charges 
+!> Split atomic charges equally into shell charges 
 subroutine get_qsh_from_qat(bas, qat, qsh)
    !> Basis set information   
    type(basis_type), intent(in) :: bas
@@ -177,7 +177,7 @@ subroutine get_qsh_from_qat(bas, qat, qsh)
    real(wp), intent(in) :: qat(:, :)
    !> Shell charges, shape: [nsh, spin]
    real(wp), intent(out) :: qsh(:, :)
-
+   
    integer :: ish, ispin
    do ispin = 1, size(qsh, 2)
       do ish = 1, size(qsh, 1)

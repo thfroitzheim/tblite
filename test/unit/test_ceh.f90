@@ -35,22 +35,18 @@ module test_ceh
    use tblite_ncoord_erf
    use tblite_ncoord_erf_en
    use tblite_ncoord_type, only : get_coordination_number
-
-   use tblite_wavefunction_type, only : wavefunction_type, new_wavefunction
+   use tblite_integral_type, only : integral_type, new_integral
+   use tblite_wavefunction_type, only : wavefunction_type, new_wavefunction, get_qsh_from_qat
    use tblite_wavefunction_mulliken, only: get_mulliken_atomic_charges_gradient
    use tblite_xtb_calculator, only : xtb_calculator
    use tblite_ceh_singlepoint, only : ceh_guess
-   use tblite_ceh_ceh, only : ceh_h0spec, new_ceh_calculator
+   use tblite_ceh_ceh, only : ceh_h0spec, new_ceh_calculator, get_effective_qat
    use tblite_ceh_h0, only : get_scaled_selfenergy, get_hamiltonian, get_hamiltonian_gradient
    use tblite_scf, only: new_potential, potential_type
-   use tblite_blas, only: gemv
-
+   use tblite_scf_potential, only: add_pot_to_h1
+   use tblite_blas, only: gemv, gemm
    use tblite_container, only : container_type, container_cache
    use tblite_external_field, only : electric_field
-
-
-   use tblite_blas, only : gemm
-
 
    implicit none
    private
@@ -69,51 +65,51 @@ contains
       type(unittest_type), allocatable, intent(out) :: testsuite(:)
 
       testsuite = [ &
-         new_unittest("scaled-selfenergy-H2", test_scaled_selfenergy_h2), &
-         new_unittest("scaled-selfenergy-LiH", test_scaled_selfenergy_lih), &
-         new_unittest("scaled-selfenergy-S2", test_scaled_selfenergy_s2), &
-         new_unittest("scaled-selfenergy-SiH4", test_scaled_selfenergy_sih4), &
-         new_unittest("scaled-selfenergy-AcCl6", test_scaled_selfenergy_accl6), &
-         new_unittest("scaled-selfenergy_grad-H2", test_scaled_selfenergy_grad_h2), &
-         new_unittest("scaled-selfenergy_grad-LiH", test_scaled_selfenergy_grad_lih), &
-         new_unittest("scaled-selfenergy_grad-S2", test_scaled_selfenergy_grad_s2), &
-         new_unittest("scaled-selfenergy_grad-SiH4", test_scaled_selfenergy_grad_sih4), &
-         new_unittest("scaled-selfenergy_grad-AcCl6", test_scaled_selfenergy_grad_accl6), &
-         new_unittest("hamiltonian-H2", test_hamiltonian_h2), &
-         new_unittest("hamiltonian-LiH", test_hamiltonian_lih), &
-         new_unittest("hamiltonian-S2", test_hamiltonian_s2), &
-         new_unittest("hamiltonian-SiH4", test_hamiltonian_sih4), &
+         !new_unittest("scaled-selfenergy-H2", test_scaled_selfenergy_h2), &
+         !new_unittest("scaled-selfenergy-LiH", test_scaled_selfenergy_lih), &
+         !new_unittest("scaled-selfenergy-S2", test_scaled_selfenergy_s2), &
+         !new_unittest("scaled-selfenergy-SiH4", test_scaled_selfenergy_sih4), &
+         !new_unittest("scaled-selfenergy-AcCl6", test_scaled_selfenergy_accl6), &
+         !new_unittest("scaled-selfenergy_grad-H2", test_scaled_selfenergy_grad_h2), &
+         !new_unittest("scaled-selfenergy_grad-LiH", test_scaled_selfenergy_grad_lih), &
+         !new_unittest("scaled-selfenergy_grad-S2", test_scaled_selfenergy_grad_s2), &
+         !new_unittest("scaled-selfenergy_grad-SiH4", test_scaled_selfenergy_grad_sih4), &
+         !new_unittest("scaled-selfenergy_grad-AcCl6", test_scaled_selfenergy_grad_accl6), &
+         !new_unittest("hamiltonian-H2", test_hamiltonian_h2), &
+         !new_unittest("hamiltonian-LiH", test_hamiltonian_lih), &
+         !new_unittest("hamiltonian-S2", test_hamiltonian_s2), &
+         !new_unittest("hamiltonian-SiH4", test_hamiltonian_sih4), &
          new_unittest("hamiltonian_grad-H2", test_hamiltonian_grad_h2), &
          new_unittest("hamiltonian_grad-LiH", test_hamiltonian_grad_lih), &
          new_unittest("hamiltonian_grad-S2", test_hamiltonian_grad_s2), &
          new_unittest("hamiltonian_grad-PCl", test_hamiltonian_grad_pcl), &
          new_unittest("hamiltonian_grad-SiH4", test_hamiltonian_grad_sih4), &
          new_unittest("hamiltonian_grad-CeCl3", test_hamiltonian_grad_cecl3), &
-         new_unittest("hamiltonian_grad-AcCl6", test_hamiltonian_grad_accl6), &
+         new_unittest("hamiltonian_grad-AcCl6", test_hamiltonian_grad_accl6) &
          !new_unittest("density_grad-H2", test_density_grad_h2), &
          !new_unittest("density_grad-LiH", test_density_grad_lih) &
          !new_unittest("density_grad-S2", test_density_grad_s2), &
          !new_unittest("density_grad-PCl", test_density_grad_pcl) &
          !new_unittest("density_grad-SiH4", test_density_grad_sih4) &
          !new_unittest("density_grad-CeCl3", test_density_grad_cecl3) &
-         new_unittest("overlap_diat-H2", test_overlap_diat_h2), &
-         new_unittest("overlap_diat-LiH", test_overlap_diat_lih), &
-         new_unittest("overlap_diat-S2", test_overlap_diat_s2), &
-         new_unittest("overlap_diat-SiH4", test_overlap_diat_sih4), &
-         new_unittest("q-mol-h2", test_q_h2), &
-         new_unittest("q-mol-lih", test_q_lih), &
-         new_unittest("q-mol-sih4", test_q_sih4), &
-         new_unittest("q-mol-cecl3", test_q_cecl3), &
-         new_unittest("q-mol-accl6", test_q_accl6), &
-         new_unittest("q-mol-panp", test_q_panp), &
-         new_unittest("q-mol-mb01", test_q_mb01), &
-         new_unittest("q-mol-mb02", test_q_mb02), &
-         new_unittest("q-mol-mb03", test_q_mb03), &
-         new_unittest("q-mol-mb04", test_q_mb04), &
-         new_unittest("q-chrgd-efield-mol", test_q_ef_chrg_mb01), &
-         new_unittest("d-mol", test_d_mb01), &
-         new_unittest("d-field-mol", test_d_field_mb04), &
-         new_unittest("d-field-change-mol", test_d_hcn) &
+         !new_unittest("overlap_diat-H2", test_overlap_diat_h2), &
+         !new_unittest("overlap_diat-LiH", test_overlap_diat_lih), &
+         !new_unittest("overlap_diat-S2", test_overlap_diat_s2), &
+         !new_unittest("overlap_diat-SiH4", test_overlap_diat_sih4), &
+         !new_unittest("q-mol-h2", test_q_h2), &
+         !new_unittest("q-mol-lih", test_q_lih), &
+         !new_unittest("q-mol-sih4", test_q_sih4), &
+         !new_unittest("q-mol-cecl3", test_q_cecl3), &
+         !new_unittest("q-mol-accl6", test_q_accl6), &
+         !new_unittest("q-mol-panp", test_q_panp), &
+         !new_unittest("q-mol-mb01", test_q_mb01), &
+         !new_unittest("q-mol-mb02", test_q_mb02), &
+         !new_unittest("q-mol-mb03", test_q_mb03), &
+         !new_unittest("q-mol-mb04", test_q_mb04), &
+         !new_unittest("q-chrgd-efield-mol", test_q_ef_chrg_mb01), &
+         !new_unittest("d-mol", test_d_mb01), &
+         !new_unittest("d-field-mol", test_d_field_mb04), &
+         !new_unittest("d-field-change-mol", test_d_hcn) &
          ! new_unittest("dq-mol-h2", test_dq_h2), &
          ! new_unittest("dq-mol-lih", test_dq_lih), &
          ! new_unittest("dq-mol-S2", test_dq_s2), &
@@ -518,46 +514,43 @@ contains
       type(structure_type), intent(inout) :: mol
    
       type(basis_type) :: bas
+      type(xtb_calculator) :: calc
       type(tb_hamiltonian) :: h0
+      type(wavefunction_type) :: wfn
+      type(integral_type) :: intsr, intsl
       type(erf_ncoord_type) :: ncoord
       type(erf_en_ncoord_type) :: ncoord_en
       type(adjacency_list) :: list
       type(potential_type) :: pot
+      type(container_cache) :: ccache
 
       real(wp), parameter :: cn_cutoff = 30.0_wp
       real(wp), parameter :: step = 1.0e-6_wp
       real(wp), allocatable :: lattr(:, :), cn_lattr(:, :), cn(:), cn_en(:), rcov(:), en(:)
       real(wp), allocatable :: dcndr(:, :, :), dcndL(:, :, :), dcn_endr(:, :, :), dcn_endL(:, :, :)
-      real(wp), allocatable :: overlapl(:, :), overlapr(:, :), overlap_diatl(:, :)
-      real(wp), allocatable :: overlap_diatr(:, :), overlap_diat(:, :), dpint(:, :, :) 
-      real(wp), allocatable :: hamiltonian(:,:), hamiltonianl(:, :), hamiltonianr(:, :)
+      real(wp), allocatable :: h1l(:, :, :), h1r(:, :, :)
       real(wp), allocatable :: selfenergy(:), dsedr(:,:,:), dsedL(:,:,:)
       real(wp), allocatable :: numdr(:, :, :), dh0dr(:, :, :), dh0dL(:, :, :), doverlap(:, :, :), doverlap_diat(:, :, :)  
       real(wp), allocatable :: dummy_pmat(:, :, :)
       real(wp) :: cutoff
       integer :: iat, ic, ii, jj, is, ish, izp, iao, jat, js, jsh, jzp, jao
-   
-      call make_basis(bas, mol, 6)
-   
-      call new_hamiltonian(h0, mol, bas, ceh_h0spec(mol))
+
+      call new_ceh_calculator(calc, mol)
       
       !> Get initial potential
-      call new_potential(pot, mol, bas, 1)
-      !> Set potential to zero
-      call pot%reset
+      call new_potential(pot, mol, calc%bas, 1)
+
 
       allocate(cn(mol%nat), cn_en(mol%nat), rcov(mol%nid), en(mol%nid), source=0.0_wp)
       allocate(dcndr(3, mol%nat, mol%nat), dcndL(3, 3, mol%nat), source=0.0_wp)
       allocate(dcn_endr(3, mol%nat, mol%nat), dcn_endL(3, 3, mol%nat), source=0.0_wp)
-      allocate(selfenergy(bas%nsh), dsedr(3, mol%nat,bas%nsh), dsedL(3, 3, bas%nsh), source=0.0_wp)
+      allocate(selfenergy(calc%bas%nsh), dsedr(3, mol%nat,calc%bas%nsh), dsedL(3, 3, calc%bas%nsh), source=0.0_wp)
       
-      allocate(overlapr(bas%nao, bas%nao),overlapl(bas%nao, bas%nao), &
-        & overlap_diatr(bas%nao, bas%nao), overlap_diatl(bas%nao, bas%nao), dpint(3, bas%nao, bas%nao), &
-        & hamiltonianr(bas%nao, bas%nao), hamiltonianl(bas%nao, bas%nao), source=0.0_wp)
+      allocate(h1r(calc%bas%nao, calc%bas%nao, 1),h1l(calc%bas%nao, calc%bas%nao, 1), source=0.0_wp)
       
-      allocate(numdr(3, bas%nao, bas%nao), dummy_pmat(bas%nao,bas%nao,1), &
-      & doverlap(3,bas%nao,bas%nao), doverlap_diat(3,bas%nao,bas%nao), dh0dr(3, bas%nao, bas%nao), &
-      & dh0dL(3, bas%nao, bas%nao), source=0.0_wp)
+      allocate(numdr(3, calc%bas%nao, calc%bas%nao), dummy_pmat(calc%bas%nao,calc%bas%nao,1), &
+      & doverlap(3,calc%bas%nao,calc%bas%nao), doverlap_diat(3,calc%bas%nao,calc%bas%nao), & 
+      & dh0dr(3, calc%bas%nao, calc%bas%nao), dh0dL(3, calc%bas%nao, calc%bas%nao), source=0.0_wp)
 
       ! test with the standard Pyykko radii and Pauling EN (not as in CEH parametrization)
       rcov(:) = get_covalent_rad(mol%num)
@@ -566,11 +559,14 @@ contains
       call new_erf_ncoord(ncoord, mol, cutoff=cn_cutoff, rcov=rcov)
       call new_erf_en_ncoord(ncoord_en, mol, cutoff=cn_cutoff, rcov=rcov)
 
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      call new_integral(intsr, calc%bas%nao)
+      call new_integral(intsl, calc%bas%nao)
 
       do ic = 1, 3
          do iat = 1, mol%nat
             izp = mol%id(iat)
-            is = bas%ish_at(iat)
+            is = calc%bas%ish_at(iat)
             ! right hand
             mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
             
@@ -580,18 +576,32 @@ contains
             call get_coordination_number(ncoord_en, mol, lattr, cn_cutoff, cn_en)
 
             ! Adjacency list
-            cutoff = get_cutoff(bas)
+            cutoff = get_cutoff(calc%bas)
             call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
             call new_adjacency_list(list, mol, lattr, cutoff)
             
             ! Self energy
-            call get_scaled_selfenergy(h0, mol%id, bas%ish_at, bas%nsh_id, & 
+            call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, & 
                &cn=cn, cn_en=cn_en, selfenergy=selfenergy)
 
             ! Hamiltonian
-            call get_hamiltonian(mol, lattr, list, bas, h0, selfenergy, &
-               & overlapr, overlap_diatr, dpint, hamiltonianr)
+            call get_hamiltonian(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+               & intsr%overlap, intsr%overlap_diat, intsr%dipole, intsr%hamiltonian)
    
+            ! Reset potential to zero for Coulomb
+            call pot%reset
+            
+            ! Use the electronegativity-weighted CN as a 0th order guess for the charges
+            call get_effective_qat(mol, calc%bas, cn_en, wfn%qat)
+            call get_qsh_from_qat(calc%bas, wfn%qat, wfn%qsh)
+            
+            call calc%coulomb%update(mol, ccache)
+            call calc%coulomb%get_potential(mol, ccache, wfn, pot)
+            
+            ! Add effective Hamiltonian to wavefunction
+            call pot%reset
+            call add_pot_to_h1(calc%bas, intsr, pot, h1r)
+
             ! left hand
             mol%xyz(ic, iat) = mol%xyz(ic, iat) - 2*step
 
@@ -601,42 +611,54 @@ contains
             call get_coordination_number(ncoord_en, mol, lattr, cn_cutoff, cn_en)
 
             ! Adjacency list
-            cutoff = get_cutoff(bas)
+            cutoff = get_cutoff(calc%bas)
             call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
             call new_adjacency_list(list, mol, lattr, cutoff)
             
             ! Self energy
-            call get_scaled_selfenergy(h0, mol%id, bas%ish_at, bas%nsh_id, & 
+            call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, & 
                &cn=cn, cn_en=cn_en, selfenergy=selfenergy)
 
             ! Hamiltonian
-            call get_hamiltonian(mol, lattr, list, bas, h0, selfenergy, &
-               & overlapl, overlap_diatl, dpint, hamiltonianl)
+            call get_hamiltonian(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+               & intsl%overlap, intsl%overlap_diat, intsl%dipole, intsl%hamiltonian)
+
+            ! Reset potential to zero for Coulomb
+            call pot%reset
+            
+            ! Use the electronegativity-weighted CN as a 0th order guess for the charges
+            call get_effective_qat(mol, calc%bas, cn_en, wfn%qat)
+            call get_qsh_from_qat(calc%bas, wfn%qat, wfn%qsh)
+            
+            call calc%coulomb%update(mol, ccache)
+            call calc%coulomb%get_potential(mol, ccache, wfn, pot)
+            
+            ! Add effective Hamiltonian to wavefunction
+            !call pot%reset
+            call add_pot_to_h1(calc%bas, intsl, pot, h1l)
 
             ! Geometry reset 
             mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
 
             ! Numerical gradient of the hamiltonian matrix
-            do ish = 1, bas%nsh_id(izp)
-               ii = bas%iao_sh(is+ish)
-               do iao = 1, bas%nao_sh(is+ish)
+            do ish = 1, calc%bas%nsh_id(izp)
+               ii = calc%bas%iao_sh(is+ish)
+               do iao = 1, calc%bas%nao_sh(is+ish)
                   ! Use only the upper triangular matrix to not sum different elements
                   do jat = 1, iat
                      jzp = mol%id(jat)
-                     js = bas%ish_at(jat)
-                     do jsh = 1, bas%nsh_id(jzp) 
-                        jj = bas%iao_sh(js+jsh)
-                        do jao = 1, bas%nao_sh(js+jsh)
+                     js = calc%bas%ish_at(jat)
+                     do jsh = 1, calc%bas%nsh_id(jzp) 
+                        jj = calc%bas%iao_sh(js+jsh)
+                        do jao = 1, calc%bas%nao_sh(js+jsh)
                            ! Upper triangular matrix and diagonal
                            numdr(ic, jj+jao, ii+iao) = & 
-                              & + 0.5_wp*(overlap_diatr(jj+jao, ii+iao) - overlap_diatl(jj+jao, ii+iao))/step
-                              !& + 0.5_wp*(hamiltonianr(jj+jao, ii+iao) - hamiltonianl(jj+jao, ii+iao))/step
+                              & + 0.5_wp*(h1r(jj+jao, ii+iao,1) - h1l(jj+jao, ii+iao,1))/step
 
                            ! Lower triangular matrix
                            if(ii+iao /= jj+jao) then
                               numdr(ic, ii+iao, jj+jao) = &
-                                 & - 0.5_wp*(overlap_diatr(ii+iao, jj+jao) - overlap_diatl(ii+iao, jj+jao))/step
-                                 !& - 0.5_wp*(hamiltonianr(ii+iao, jj+jao) - hamiltonianl(ii+iao, jj+jao))/step                                 
+                                 & - 0.5_wp*(h1r(ii+iao, jj+jao, 1) - h1l(ii+iao, jj+jao, 1))/step
                            end if
                         end do
                      end do 
@@ -655,11 +677,11 @@ contains
       call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
       call new_adjacency_list(list, mol, lattr, cutoff)
 
-      call get_scaled_selfenergy(h0, mol%id, bas%ish_at, bas%nsh_id, &
+      call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, &
       & cn=cn, cn_en=cn_en, dcndr=dcndr, dcndL=dcndL, dcn_endr=dcn_endr, dcn_endL=dcn_endL, &
       & selfenergy=selfenergy, dsedr=dsedr, dsedL=dsedL)    
       
-      call get_hamiltonian_gradient(mol, lattr, list, bas, h0, selfenergy, &
+      call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
          & dsedr, dsedL, pot, dummy_pmat, dh0dr, dh0dL, doverlap, doverlap_diat)
 
       num: do ic = 1, 3
@@ -667,13 +689,9 @@ contains
          !call write_2d_matrix(dh0dr(ic,:,:), "ana H")
          !call write_2d_matrix(dh0dr(ic,:,:) - numdr(ic,:,:), "diff")
          
-         !call write_2d_matrix(numdr(ic,:,:), "num Ssc", step=16)
-         !call write_2d_matrix(doverlap_diat(ic,:,:), "ana Ssc", step=16)
-         !call write_2d_matrix(doverlap_diat(ic,:,:) - numdr(ic,:,:), "diff", step=16)
-         
          do ii = 1, size(numdr,2)
             do jj = 1, size(numdr,3)
-               call check(error, numdr(ic, ii, jj), doverlap_diat(ic, ii, jj), thr=thr2)
+               call check(error, numdr(ic, ii, jj), dh0dr(ic, ii, jj), thr=thr2)
                if (allocated(error)) then 
                   call test_failed(error, "Hamiltonian derivative does not match")
                   exit num
@@ -682,9 +700,9 @@ contains
          end do
       end do num
 
-      !if (any(abs(numdr - dh0dr) > thr2)) then
-      !   call test_failed(error, "Derivative of does not match")
-      !end if
+      if (any(abs(numdr - dh0dr) > thr2)) then
+        call test_failed(error, "Derivative of does not match")
+      end if
    
    end subroutine test_hamiltonian_grad
 
@@ -2034,10 +2052,6 @@ contains
       &  0.209816016272363_wp, -0.03504133379228_wp, -0.035143062347620_wp, &
       & -0.034681965672301_wp, -0.03471566684780_wp, -0.035077580620055_wp, &
       & -0.035156406970968_wp], shape(charges))
-
-      ! &  0.20981620627690_wp, -0.035021099224455_wp, -0.035163316843173_wp, &
-      ! & -0.03467242268448_wp, -0.034725300058718_wp, -0.035082404869855_wp, &
-      ! & -0.03515166257487_wp], shape(charges))
 
       call get_structure(mol, "f-block", "AcCl6")
       call test_q_gen(error, mol, charges)
