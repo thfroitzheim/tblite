@@ -45,7 +45,7 @@ jobs:
           build: meson
           build-type: debug
           compiler: gnu
-          version: 11
+          version: 10
 
         - os: ubuntu-latest
           build: meson
@@ -57,7 +57,7 @@ jobs:
           build: cmake
           build-type: debug
           compiler: gnu
-          version: 11
+          version: 10
 
         - os: ubuntu-latest
           build: meson
@@ -99,6 +99,7 @@ jobs:
       if: ${{ contains(matrix.os, 'macos') && matrix.compiler == 'gnu' }}
       run: |
         brew install gcc@${{ env.GCC_V }} openblas
+        rm /usr/local/bin/gfortran
         ln -s /usr/local/bin/gfortran-${{ env.GCC_V }} /usr/local/bin/gfortran
         ln -s /usr/local/bin/gcc-${{ env.GCC_V }} /usr/local/bin/gcc
         ln -s /usr/local/bin/g++-${{ env.GCC_V }} /usr/local/bin/g++
@@ -329,7 +330,7 @@ jobs:
 
         include:
         - os: macos-13
-          gcc_v: 11
+          gcc_v: 10
           python_v: '3.9'
 
     env:
@@ -352,6 +353,7 @@ jobs:
       if: ${{ contains(matrix.os, 'macos') }}
       run: |
         brew install gcc@${{ env.GCC_V }} openblas
+        rm /usr/local/bin/gfortran
         ln -s /usr/local/bin/gfortran-${{ env.GCC_V }} /usr/local/bin/gfortran
         ln -s /usr/local/bin/gcc-${{ env.GCC_V }} /usr/local/bin/gcc
         ln -s /usr/local/bin/g++-${{ env.GCC_V }} /usr/local/bin/g++
