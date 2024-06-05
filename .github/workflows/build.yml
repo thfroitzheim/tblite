@@ -45,7 +45,7 @@ jobs:
           build: meson
           build-type: debug
           compiler: gnu
-          version: 11
+          version: 10
 
         - os: ubuntu-latest
           build: meson
