@@ -41,7 +41,7 @@ module tblite_ceh_singlepoint
    use tblite_ceh_h0, only : get_hamiltonian, get_hamiltonian_gradient, &
    & get_scaled_selfenergy, get_occupation
    use tblite_ceh_coupled_perturbed, only : get_density_matrix_gradient
-   use tblite_ceh_ceh, only : get_effective_qat
+   use tblite_ceh_ceh, only : get_effective_q
    use tblite_xtb_spec, only : tb_h0spec 
    use tblite_xtb_calculator, only : xtb_calculator
    use tblite_timer, only : timer_type, format_time
@@ -241,7 +241,7 @@ contains
          
          ! Get the derivative of the Fock matrix elements
          call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
-            & dsedr, dsedL, pot, wfn%density, dh0dr, dh0dL, doverlap, doverlap_diat)
+            & dsedr, dsedL, pot, doverlap, doverlap_diat, dh0dr, dh0dL)
          
          ! Use the matrix element derivatives (F + S) to get the density matrix graidient
          ! based on the coupled-perturbed formalism
@@ -250,9 +250,9 @@ contains
 
          ! Derivative of the CEH Mulliken charges
          call get_mulliken_atomic_charges_gradient(calc%bas, mol, ints%overlap, wfn%density, &
-         & doverlap, wfn%ddensitydr, wfn%ddensitydL, wfn%dqdr, wfn%dqdL)
-         wfn%dqdr= 0.0_wp
-         wfn%dqdL = 0.0_wp
+         & doverlap, wfn%ddensitydr, wfn%ddensitydL, wfn%dqatdr, wfn%dqatdL)
+         wfn%dqatdr= 0.0_wp
+         wfn%dqatdL = 0.0_wp
 
       end if 
       

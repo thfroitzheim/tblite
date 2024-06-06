@@ -40,7 +40,7 @@ module test_ceh
    use tblite_wavefunction_mulliken, only: get_mulliken_atomic_charges_gradient
    use tblite_xtb_calculator, only : xtb_calculator
    use tblite_ceh_singlepoint, only : ceh_guess
-   use tblite_ceh_ceh, only : ceh_h0spec, new_ceh_calculator, get_effective_qat
+   use tblite_ceh_ceh, only : ceh_h0spec, new_ceh_calculator, get_effective_q
    use tblite_ceh_h0, only : get_scaled_selfenergy, get_hamiltonian, get_hamiltonian_gradient
    use tblite_scf, only: new_potential, potential_type
    use tblite_scf_potential, only: add_pot_to_h1

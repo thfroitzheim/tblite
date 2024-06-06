@@ -37,7 +37,7 @@ module tblite_ceh_ceh
    implicit none
    private
 
-   public :: ceh_h0spec, new_ceh_calculator, get_effective_qat
+   public :: ceh_h0spec, new_ceh_calculator, get_effective_q
 
    integer, parameter, private :: max_elem = 103
    integer, parameter, private :: max_shell = 4

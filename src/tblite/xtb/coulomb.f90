@@ -135,9 +135,9 @@ subroutine get_potential_gradient(self, mol, cache, wfn, pot)
    !> Density dependent potential
    type(potential_type), intent(inout) :: pot
 
-   !if (allocated(self%es2)) then
-   !   call self%es2%get_potential_gradient(mol, cache, wfn, pot)
-   !end if
+   if (allocated(self%es2)) then
+      call self%es2%get_potential_gradient(mol, cache, wfn, pot)
+   end if
 
    if (allocated(self%aes2)) then
       call self%aes2%get_potential_gradient(mol, cache, wfn, pot)

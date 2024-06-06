@@ -21,7 +21,6 @@
 module tblite_wavefunction_type
    use mctc_env, only : wp
    use tblite_blas, only : gemm
-
    implicit none
    private
 
