@@ -110,17 +110,17 @@ contains
       ! 2. Transform the overlap submatrix to the diatomic frame: S' = O^T * S * O
       if (maxl > 0) then
          ! interm_oso = O^T * S * O
-         call gemm(amat=trafomat(3,:,:),bmat=block_overlap,cmat=tmp,transa='T',transb='N')
+         call gemm(amat=trafomat(3,:,:),bmat=block_overlap(1:trafo_dim, 1:trafo_dim),cmat=tmp,transa='T',transb='N')
          call gemm(amat=tmp,bmat=trafomat(3,:,:),cmat=interm_oso,transa='N',transb='N')
          do ic = 1, 3
             ! interm_doso = dO^T * S * O
-            call gemm(amat=dtrafomat(ic,:,:),bmat=block_overlap,cmat=tmp,transa='T',transb='N')
+            call gemm(amat=dtrafomat(ic,:,:),bmat=block_overlap(1:trafo_dim, 1:trafo_dim),cmat=tmp,transa='T',transb='N')
             call gemm(amat=tmp,bmat=trafomat(ic,:,:),cmat=interm_doso(ic,:,:),transa='N',transb='N')
             ! interm_osdo = O^T * S * dO
-            call gemm(amat=trafomat(ic,:,:),bmat=block_overlap,cmat=tmp,transa='T',transb='N')
+            call gemm(amat=trafomat(ic,:,:),bmat=block_overlap(1:trafo_dim, 1:trafo_dim),cmat=tmp,transa='T',transb='N')
             call gemm(amat=tmp,bmat=dtrafomat(ic,:,:),cmat=interm_osdo(ic,:,:),transa='N',transb='N')
             ! interm_odso = O^T * dS * O
-            call gemm(amat=trafomat(ic,:,:),bmat=block_doverlap(ic,:,:),cmat=tmp,transa='T',transb='N')
+            call gemm(amat=trafomat(ic,:,:),bmat=block_doverlap(ic, 1:trafo_dim, 1:trafo_dim),cmat=tmp,transa='T',transb='N')
             call gemm(amat=tmp,bmat=trafomat(ic,:,:),cmat=interm_odso(ic,:,:),transa='N',transb='N')
          end do
       else
@@ -142,27 +142,31 @@ contains
       if (maxl > 0) then
          ! block_overlap = O * S' * O^T
          call gemm(amat=trafomat(3,:,:),bmat=interm_oso,cmat=tmp,transa='N',transb='N')
-         call gemm(amat=tmp,bmat=trafomat(3,:,:),cmat=block_overlap,transa='N',transb='T')
+         call gemm(amat=tmp,bmat=trafomat(3,:,:),cmat=block_overlap(1:trafo_dim, 1:trafo_dim),transa='N',transb='T')
 
          do ic = 1, 3
             ! block_doverlap = dO * S' * O^T + O * S' * dO^T
             call gemm(amat=dtrafomat(ic,:,:),bmat=interm_oso,cmat=tmp,transa='N',transb='N')
-            call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat(ic,:,:),cmat=block_doverlap(ic,:,:),transa='N',transb='T')
+            call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat(ic,:,:), &
+               & cmat=block_doverlap(ic, 1:trafo_dim, 1:trafo_dim),transa='N',transb='T')
 
             call gemm(amat=trafomat(ic,:,:),bmat=interm_oso,cmat=tmp,transa='N',transb='N')
-            call gemm(alpha=1.0_wp,amat=tmp,bmat=dtrafomat(ic,:,:),beta=1.0_wp,&
-            &cmat=block_doverlap(ic,:,:),transa='N',transb='T')
+            call gemm(alpha=1.0_wp,amat=tmp,bmat=dtrafomat(ic,:,:),beta=1.0_wp, &
+               &cmat=block_doverlap(ic, 1:trafo_dim, 1:trafo_dim),transa='N',transb='T')
             
             ! block_doverlap += O * (dOSO)' * O^T + O * (OSdO)' * O^T 
             call gemm(amat=trafomat(ic,:,:),bmat=interm_doso(ic,:,:),cmat=tmp,transa='N',transb='N')
-            call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat(ic,:,:),beta=1.0_wp,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
+            call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat(ic,:,:),beta=1.0_wp, &
+               & cmat=block_doverlap(ic, 1:trafo_dim, 1:trafo_dim),transa='N',transb='T')
 
             call gemm(amat=trafomat(ic,:,:),bmat=interm_odso(ic,:,:),cmat=tmp,transa='N',transb='N')
-            call gemm(amat=tmp,bmat=trafomat(ic,:,:),beta=1.0_wp,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
+            call gemm(amat=tmp,bmat=trafomat(ic,:,:),beta=1.0_wp, &
+               & cmat=block_doverlap(ic, 1:trafo_dim, 1:trafo_dim),transa='N',transb='T')
             
             ! block_doverlap += O * (OdSO)' * O^T 
             call gemm(amat=trafomat(ic,:,:),bmat=interm_osdo(ic,:,:),cmat=tmp,transa='N',transb='N')
-            call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat(ic,:,:),beta=1.0_wp,cmat=block_doverlap(ic,:,:),transa='N',transb='T')
+            call gemm(alpha=1.0_wp,amat=tmp,bmat=trafomat(ic,:,:),beta=1.0_wp, &
+               & cmat=block_doverlap(ic, 1:trafo_dim, 1:trafo_dim),transa='N',transb='T')
          end do
       else
          block_overlap(1,1) = interm_oso(1,1)

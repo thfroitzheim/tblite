@@ -81,10 +81,10 @@ contains
       end if
       if (allocated(error)) return
 
-      if (config%grad) then
-         call fatal_error(error, "Charge gradient not yet implemented.")
-      end if
-      if (allocated(error)) return
+      ! if (config%grad) then
+      !    call fatal_error(error, "Charge gradient not yet implemented.")
+      ! end if
+      ! if (allocated(error)) return
 
       if (allocated(config%charge)) then
          mol%charge = config%charge
@@ -122,7 +122,7 @@ contains
       if (allocated(config%method)) method = config%method
       if (method == "ceh") then
          call new_ceh_calculator(calc_ceh, mol)
-         call new_wavefunction(wfn_ceh, mol%nat, calc_ceh%bas%nsh, calc_ceh%bas%nao, 1, config%etemp_guess * kt)
+         call new_wavefunction(wfn_ceh, mol%nat, calc_ceh%bas%nsh, calc_ceh%bas%nao, 1, config%etemp_guess * kt, config%grad)
       end if
 
       if (allocated(config%efield) .and. config%method == "ceh") then

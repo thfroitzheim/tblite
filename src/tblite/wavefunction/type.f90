@@ -21,12 +21,11 @@
 module tblite_wavefunction_type
    use mctc_env, only : wp
    use tblite_blas, only : gemm
-   use tblite_basis_type, only : basis_type
    implicit none
    private
 
    public :: new_wavefunction
-   public :: get_density_matrix, get_alpha_beta_occupation, get_qsh_from_qat
+   public :: get_density_matrix, get_alpha_beta_occupation
 
    !> Tight-binding wavefunction
    type, public :: wavefunction_type
@@ -71,23 +70,30 @@ module tblite_wavefunction_type
       !> Derivative of the density matrix  w.r.t. the lattice vectors: [3, nao, nao, spin]
       real(wp), allocatable :: ddensitydL(:, :, :, :)
 
-      !> Derivative of CEH chargs w.r.t. the positions: [3, nat, nsh]
-      real(wp), allocatable :: dqdr(:, :, :)
-      !> Derivative of CEH chargs w.r.t. the lattice vectors: [3, 3, nsh]
-      real(wp), allocatable :: dqdL(:, :, :)
+      !> Derivative of CEH chargs w.r.t. the positions: [3, nat, nat, spin]
+      real(wp), allocatable :: dqatdr(:, :, :, :)
+      !> Derivative of CEH chargs w.r.t. the lattice vectors: [3, 3, nat, spin]
+      real(wp), allocatable :: dqatdL(:, :, :, :)
+
+      !> Derivative of CEH chargs w.r.t. the positions: [3, nat, nsh, spin]
+      real(wp), allocatable :: dqshdr(:, :, :, :)
+      !> Derivative of CEH chargs w.r.t. the lattice vectors: [3, 3, nsh, spin]
+      real(wp), allocatable :: dqshdL(:, :, :, :)
 
    end type wavefunction_type
 
 contains
 
 
-subroutine new_wavefunction(self, nat, nsh, nao, nspin, kt)
+subroutine new_wavefunction(self, nat, nsh, nao, nspin, kt, grad)
    type(wavefunction_type), intent(out) :: self
    integer, intent(in) :: nat
    integer, intent(in) :: nsh
    integer, intent(in) :: nao
    integer, intent(in) :: nspin
    real(wp), intent(in) :: kt
+   !> Flag to indicate if a wavefunction gradient is requested
+   logical, intent(in), optional :: grad
 
    self%nspin = nspin
    self%kt = kt
@@ -109,16 +115,27 @@ subroutine new_wavefunction(self, nat, nsh, nao, nspin, kt)
    allocate(self%dpat(3, nat, nspin))
    allocate(self%qpat(6, nat, nspin))
 
-   allocate(self%ddensitydr(3, nao, nao, nspin))
-   allocate(self%ddensitydL(3, nao, nao, nspin))
+   ! Check if a wavefunction gradient is requested
+   if(present(grad)) then
+      if(grad) then
+         allocate(self%ddensitydr(3, nao, nao, nspin))
+         allocate(self%ddensitydL(3, nao, nao, nspin))
 
-   allocate(self%dqdr(3, nat, nat))
-   allocate(self%dqdL(3, 3, nat))
-    
-   self%dqdr(:, :, :) = 0.0_wp
-   self%dqdL(:, :, :) = 0.0_wp
-   self%ddensitydr(:, :, :, :) = 0.0_wp
-   self%ddensitydL(:, :, :, :) = 0.0_wp
+         allocate(self%dqatdr(3, nat, nat, nspin))
+         allocate(self%dqatdL(3, 3, nat, nspin))
+
+         allocate(self%dqshdr(3, nat, nsh, nspin))
+         allocate(self%dqshdL(3, 3, nsh, nspin))
+
+         self%dqshdr(:, :, :, :) = 0.0_wp
+         self%dqshdL(:, :, :, :) = 0.0_wp
+         self%dqatdr(:, :, :, :) = 0.0_wp
+         self%dqatdL(:, :, :, :) = 0.0_wp
+         self%ddensitydr(:, :, :, :) = 0.0_wp
+         self%ddensitydL(:, :, :, :) = 0.0_wp
+      end if
+   end if
+
    self%density(:, :, :) = 0.0_wp
    self%coeff(:, :, :) = 0.0_wp
    self%qat(:, :) = 0.0_wp
@@ -169,22 +186,5 @@ subroutine get_alpha_beta_occupation(nocc, nuhf, nalp, nbet)
    nbet = ntmp / 2
 end subroutine get_alpha_beta_occupation
 
-!> Split atomic charges equally into shell charges 
-subroutine get_qsh_from_qat(bas, qat, qsh)
-   !> Basis set information   
-   type(basis_type), intent(in) :: bas
-   !> Atomic charges, shape: [nat, spin]
-   real(wp), intent(in) :: qat(:, :)
-   !> Shell charges, shape: [nsh, spin]
-   real(wp), intent(out) :: qsh(:, :)
-   
-   integer :: ish, ispin
-   do ispin = 1, size(qsh, 2)
-      do ish = 1, size(qsh, 1)
-         qsh(ish, ispin) = qat(bas%sh2at(ish), ispin) / dble(bas%nsh_at(bas%sh2at(ish)))
-      end do
-   end do
-
-end subroutine get_qsh_from_qat
 
 end module tblite_wavefunction_type

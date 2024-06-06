@@ -76,8 +76,8 @@ subroutine get_mulliken_atomic_charges_gradient(bas, mol, smat, pmat, dsmat, dpm
    real(wp), intent(in) :: dsmat(:, :, :)
    real(wp), intent(in) :: dpmatdr(:, :, :, :)
    real(wp), intent(in) :: dpmatdL(:, :, :, :)
-   real(wp), intent(out) :: dqatdr(:, :, :)
-   real(wp), intent(out) :: dqatdL(:, :, :)
+   real(wp), intent(out) :: dqatdr(:, :, :, :)
+   real(wp), intent(out) :: dqatdL(:, :, :, :)
 
    integer :: ic, iao, jao, spin, kao, jat, kat, iat 
    real(wp) :: dpao, vec(3), r2, r
@@ -133,14 +133,14 @@ subroutine get_mulliken_atomic_charges_gradient(bas, mol, smat, pmat, dsmat, dpm
                !do kat = 1,size(dqatdr,3)
                   if(iat == jat) then
                      !if(kat == jat) then
-                     dqatdr(ic, iat, jat) = dqatdr(ic, iat, jat) + tmp(iat, jat)
+                     dqatdr(ic, iat, jat, 1) = dqatdr(ic, iat, jat, 1) + tmp(iat, jat)
                      !else
                      !   dqatdr(ic, iat, jat) = dqatdr(ic, iat, jat) - tmp(kat, jat) !* 
                      !end if
                   else
                      !if(kat == jat) then
-                     dqatdr(ic, iat, jat) = dqatdr(ic, iat, jat) + tmp(iat, jat) !* vec(ic)/r
-                     dqatdr(ic, jat, iat) = dqatdr(ic, jat, iat) + tmp(jat, iat) !* vec(ic)/r
+                     dqatdr(ic, iat, jat, 1) = dqatdr(ic, iat, jat, 1) + tmp(iat, jat) !* vec(ic)/r
+                     dqatdr(ic, jat, iat, 1) = dqatdr(ic, jat, iat, 1) + tmp(jat, iat) !* vec(ic)/r
                      !else
                      !   dqatdr(ic, iat, jat) = dqatdr(ic, iat, jat) + tmp(kat, jat) !* 
                      !end if

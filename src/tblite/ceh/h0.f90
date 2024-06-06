@@ -26,10 +26,10 @@ module tblite_ceh_h0
    use tblite_xtb_h0, only : tb_hamiltonian
    use tblite_integral_dipole, only: get_dipole_integrals, dipole_cgto, &
    & dipole_cgto_diat, maxl, msao, smap
-   use tblite_integral_overlap, only: overlap_grad_cgto_diat
+   use tblite_integral_overlap, only: overlap_grad_cgto
    use tblite_adjlist, only : adjacency_list
    use tblite_scf_potential, only : potential_type
-   use tblite_integral_diat_trafo, only: diat_trafo
+   use tblite_integral_diat_trafo, only: diat_trafo, diat_trafo_grad
 
    implicit none
    private
@@ -297,7 +297,7 @@ contains
 
 
    subroutine get_hamiltonian_gradient(mol, trans, list, bas, h0, selfenergy, &
-         & dsedr, dsedL, pot, pmat, dh0dr, dh0dL, doverlap, doverlap_diat)
+         & dsedr, dsedL, pot, doverlap, doverlap_diat, dh0dr, dh0dL)
       !> Molecular structure data
       type(structure_type), intent(in) :: mol
       !> Lattice points within a given realspace cutoff
@@ -316,38 +316,35 @@ contains
       real(wp), intent(in) :: dsedL(:, :, :)
       !> Density dependent potential shifts on the Hamiltonian
       type(potential_type), intent(in) :: pot
-      !> Density matrix
-      real(wp), intent(in) :: pmat(:, :, :)
-      !> Derivative of the electronic energy w.r.t. coordinate displacements
-      real(wp), intent(inout) :: dh0dr(:, :, :)
-      !> Derivative of the electronic energy w.r.t. the lattice vector
-      real(wp), intent(inout) :: dh0dL(:, :, :)
       !> Derivative of the electronic energy w.r.t. coordinate displacements
       real(wp), intent(inout) :: doverlap(:, :, :)
       !> Derivative of the electronic energy w.r.t. coordinate displacements
       real(wp), intent(inout) :: doverlap_diat(:, :, :)
+      !> Derivative of the electronic energy w.r.t. coordinate displacements
+      real(wp), intent(inout) :: dh0dr(:, :, :)
+      !> Derivative of the electronic energy w.r.t. the lattice vector
+      real(wp), intent(inout) :: dh0dL(:, :, :)
    
       integer :: iat, jat, izp, jzp, itr, img, inl, spin, nspin
-      integer :: ish, jsh, is, js, ii, jj, iao, jao, nao, ij, ji
-      real(wp) :: rr, r2, vec(3), cutoff2, hij, dG(3), hscale, hs
-      real(wp) :: shpolyi, shpolyj, shpoly, dshpoly, dsv(3)
-      real(wp) :: sval, dcni, dcnj, dhdcni, dhdcnj, hpij, pij
-      real(wp), allocatable :: stmp(:), stmp_diat(:) 
-      real(wp), allocatable :: dstmp(:, :), dstmp_diat(:, :) 
-      real(wp), allocatable :: dhijdr(:,:), dhijdL(:,:)
+      integer :: ish, jsh, is, js, ii, jj, iao, jao, nao, ij, iaosh, jaosh
+      real(wp) :: rr, r2, vec(3), hij, vij
+      real(wp), allocatable :: stmp(:), dstmp(:, :)
+      real(wp), allocatable :: block_overlap(:,:), block_doverlap(:,:,:)
+      real(wp), allocatable :: dhijdr(:,:), dhijdL(:,:), dvijdr(:,:), dvijdL(:,:)
 
       doverlap(:, :, :) = 0.0_wp
+      doverlap_diat(:, :, :) = 0.0_wp
       dh0dr(:, :, :) = 0.0_wp
       dh0dL(:, :, :) = 0.0_wp
 
       allocate(stmp(msao(bas%maxl)**2), dstmp(3, msao(bas%maxl)**2), &
-         & stmp_diat(msao(bas%maxl)**2), dstmp_diat(3, msao(bas%maxl)**2), &
-         & dhijdr(3,mol%nat), dhijdL(3,3)) 
+      & block_overlap(smap(bas%maxl+1),smap(bas%maxl+1)), block_doverlap(3,smap(bas%maxl+1),smap(bas%maxl+1)), &
+      & dhijdr(3,mol%nat), dhijdL(3,3), dvijdr(3,mol%nat), dvijdL(3,3))
 
-      !$omp parallel do schedule(runtime) default(none) reduction(+: doverlap, doverlap_diat, dh0dr) &
+      !$omp parallel do schedule(runtime) default(none) reduction(+: doverlap, doverlap_diat, dh0dr, dh0dL) &
       !$omp shared(mol, bas, trans, h0, selfenergy, dsedr, dsedL, pot, list) &
-      !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, ij, ji, &
-      !$omp& r2, vec, stmp, dstmp, stmp_diat, dstmp_diat, hij, dhijdr, dhijdL, rr, inl, img)
+      !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, ij, iaosh, jaosh, &
+      !$omp& r2, vec, stmp, dstmp, block_overlap, block_doverlap, hij, vij, dhijdr, dhijdL, dhvjdr, dvijdL, rr, inl, img)
       do iat = 1, mol%nat
          izp = mol%id(iat)
          is = bas%ish_at(iat)
@@ -357,22 +354,65 @@ contains
             itr = list%nltr(img+inl)
             jzp = mol%id(jat)
             js = bas%ish_at(jat)
-            !if (iat == jat) cycle
+            if (iat == jat) cycle
             vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
             r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
             rr = sqrt(sqrt(r2) / (h0%rad(jzp) + h0%rad(izp)))
+
+            ! Get the overlap gradient integrals for the current diatomic pair
+            block_overlap = 0.0_wp
+            block_doverlap = 0.0_wp
             do ish = 1, bas%nsh_id(izp)
                ii = bas%iao_sh(is+ish)
+               iaosh = smap(ish-1) ! Offset for the block overlap matrix
                do jsh = 1, bas%nsh_id(jzp)
                   jj = bas%iao_sh(js+jsh)
-                  stmp = 0.0_wp
-                  dstmp = 0.0_wp
-                  stmp_diat = 0.0_wp 
-                  dstmp_diat = 0.0_wp
+                  jaosh = smap(jsh-1) ! Offset for the block overlap matrix
 
-                  call overlap_grad_cgto_diat(bas%cgto(jsh,jzp), bas%cgto(ish,izp), r2, vec, &
-                  & bas%intcut, h0%ksig(izp,jzp), h0%kpi(izp,jzp), h0%kdel(izp,jzp), &
-                  & stmp, dstmp, stmp_diat, dstmp_diat)
+                  call overlap_grad_cgto(bas%cgto(jsh,jzp), bas%cgto(ish,izp), r2, vec, &
+                  & bas%intcut, stmp, dstmp)
+
+                  ! Store the overlap and overlap gradient
+                  nao = msao(bas%cgto(jsh, jzp)%ang)
+                  do iao = 1, msao(bas%cgto(ish, izp)%ang)
+                     do jao = 1, nao
+                        ij = jao + nao*(iao-1)
+
+                        !$omp atomic
+                        block_overlap(jaosh+jao, iaosh+iao) = block_overlap(jaosh+jao, iaosh+iao) &
+                           + stmp(ij)
+
+                        !$omp atomic
+                        block_doverlap(:, jaosh+jao, iaosh+iao) = block_doverlap(:, jaosh+jao, iaosh+iao) &
+                           + dstmp(:, ij)
+
+                        !$omp atomic
+                        doverlap(:, jj+jao, ii+iao) = doverlap(:, jj+jao, ii+iao) &
+                           & + dstmp(:,ij)
+                        !$omp atomic
+                        doverlap(:, ii+iao, jj+jao) = doverlap(:, ii+iao, jj+jao) &
+                           & - dstmp(:,ij)
+
+                     end do
+                  end do
+
+               end do
+            end do
+
+            ! Diatomic frame transformation and scaling of the overlap gradient
+            call diat_trafo_grad(block_overlap, block_doverlap, vec, h0%ksig(izp,jzp), h0%kpi(izp,jzp), h0%kdel(izp,jzp), &
+               & max(bas%nsh_at(iat), bas%nsh_at(jat)) - 1) 
+
+            dvijdr(:,:) = 0.5_wp * (pot%dvatdr(:, :, iat, 1) + pot%dvatdr(:, :, jat, 1))
+            dvijdL(:,:) = 0.5_wp * (pot%dvatdL(:, :, iat, 1) + pot%dvatdL(:, :, jat, 1))
+
+            ! Setup the Hamiltonian gradient and store the diatomic frame scaled overlap gradient. 
+            do ish = 1, bas%nsh_id(izp)
+               ii = bas%iao_sh(is+ish)
+               iaosh = smap(ish-1) ! Offset for the block overlap matrix
+               do jsh = 1, bas%nsh_id(jzp)
+                  jj = bas%iao_sh(js+jsh)
+                  jaosh = smap(jsh-1) ! Offset for the block overlap matrix
 
                   hij = 0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (selfenergy(is+ish) + selfenergy(js+jsh))
                   
@@ -384,34 +424,26 @@ contains
                      do jao = 1, nao
                         ij = jao + nao*(iao-1)
 
-                        doverlap(:, jj+jao, ii+iao) = doverlap(:, jj+jao, ii+iao) &
-                           & + dstmp(:,ij)
-                        doverlap(:, ii+iao, jj+jao) = doverlap(:, ii+iao, jj+jao) &
-                           & - dstmp(:,ij)
-
                         doverlap_diat(:, jj+jao, ii+iao) = doverlap_diat(:, jj+jao, ii+iao) &
-                           & + dstmp_diat(:,ij)
+                           & + block_doverlap(:, jaosh+jao, iaosh+iao)
                         doverlap_diat(:, ii+iao, jj+jao) = doverlap_diat(:, ii+iao, jj+jao) &
-                           & - dstmp_diat(:,ij)
-
-                        ! Potentials
-                        !pij = pmat(jj+jao, ii+iao,1)
-                        !sval = - pij * (pot%vao(jj +jao,1) + pot%vao(ii+iao,1))
+                           & - block_doverlap(:, jaosh+jao, iaosh+iao)
+                        
+                        vij = 0.5_wp * (pot%vao(jj +jao,1) + pot%vao(ii+iao,1))
 
                         dh0dr(:, jj+jao, ii+iao) = dh0dr(:, jj+jao, ii+iao) &
-                           & + dstmp_diat(:,ij) * (hij) &
-                           & + stmp_diat(ij) * dhijdr(:,iat)                        
+                           & + block_doverlap(:, jaosh+jao, iaosh+iao) * (hij - vij) &
+                           & + block_overlap(jaosh+jao, iaosh+iao) * (dhijdr(:,iat) - dvijdr(:,iat))
                         dh0dr(:, ii+iao, jj+jao) = dh0dr(:, ii+iao, jj+jao) &
-                           & - dstmp_diat(:,ij) * (hij) &
-                           & - stmp_diat(ij) * dhijdr(:,iat)
+                           & - block_doverlap(:, jaosh+jao, iaosh+iao) * (hij - vij) &
+                           & - block_overlap(jaosh+jao, iaosh+iao) * (dhijdr(:,iat) - dvijdr(:,iat))
 
                         !dh0dL(:,:,jj+jao, ii+iao) = dh0dL(:,:,jj+jao, ii+iao) &
                         !   & + spread(dstmp_diat(:,ij) * (hij + sval), 1, 3) !+ stmp_diat(ij) * dhijdL(:,:)
                         !dh0dL(:,:,jj+jao, ii+iao) = dh0dL(:,:,jj+jao, ii+iao) &
                         !   & + spread(dstmp_diat(:,ij) * (hij + sval), 1, 3) + stmp_diat(ij) * dhijdL(:,:)
-
                      end do
-                  end do
+                  end do 
                end do
             end do
          end do

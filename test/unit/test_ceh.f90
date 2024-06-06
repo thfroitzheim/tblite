@@ -36,11 +36,11 @@ module test_ceh
    use tblite_ncoord_erf_en
    use tblite_ncoord_type, only : get_coordination_number
    use tblite_integral_type, only : integral_type, new_integral
-   use tblite_wavefunction_type, only : wavefunction_type, new_wavefunction, get_qsh_from_qat
+   use tblite_wavefunction_type, only : wavefunction_type, new_wavefunction
    use tblite_wavefunction_mulliken, only: get_mulliken_atomic_charges_gradient
    use tblite_xtb_calculator, only : xtb_calculator
    use tblite_ceh_singlepoint, only : ceh_guess
-   use tblite_ceh_ceh, only : ceh_h0spec, new_ceh_calculator, get_effective_qat
+   use tblite_ceh_ceh, only : ceh_h0spec, new_ceh_calculator, get_effective_q
    use tblite_ceh_h0, only : get_scaled_selfenergy, get_hamiltonian, get_hamiltonian_gradient
    use tblite_scf, only: new_potential, potential_type
    use tblite_scf_potential, only: add_pot_to_h1
@@ -538,7 +538,7 @@ contains
       call new_ceh_calculator(calc, mol)
       
       !> Get initial potential
-      call new_potential(pot, mol, calc%bas, 1)
+      call new_potential(pot, mol, calc%bas, 1, .true.)
 
 
       allocate(cn(mol%nat), cn_en(mol%nat), rcov(mol%nid), en(mol%nid), source=0.0_wp)
@@ -559,7 +559,7 @@ contains
       call new_erf_ncoord(ncoord, mol, cutoff=cn_cutoff, rcov=rcov)
       call new_erf_en_ncoord(ncoord_en, mol, cutoff=cn_cutoff, rcov=rcov)
 
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .true.)
       call new_integral(intsr, calc%bas%nao)
       call new_integral(intsl, calc%bas%nao)
 
@@ -592,14 +592,13 @@ contains
             call pot%reset
             
             ! Use the electronegativity-weighted CN as a 0th order guess for the charges
-            call get_effective_qat(mol, calc%bas, cn_en, wfn%qat)
-            call get_qsh_from_qat(calc%bas, wfn%qat, wfn%qsh)
+            call get_effective_q(mol, calc%bas, cn_en, wfn%qat, wfn%qsh)
             
             call calc%coulomb%update(mol, ccache)
             call calc%coulomb%get_potential(mol, ccache, wfn, pot)
             
             ! Add effective Hamiltonian to wavefunction
-            call pot%reset
+            !call pot%reset
             call add_pot_to_h1(calc%bas, intsr, pot, h1r)
 
             ! left hand
@@ -627,8 +626,7 @@ contains
             call pot%reset
             
             ! Use the electronegativity-weighted CN as a 0th order guess for the charges
-            call get_effective_qat(mol, calc%bas, cn_en, wfn%qat)
-            call get_qsh_from_qat(calc%bas, wfn%qat, wfn%qsh)
+            call get_effective_q(mol, calc%bas, cn_en, wfn%qat, wfn%qsh)
             
             call calc%coulomb%update(mol, ccache)
             call calc%coulomb%get_potential(mol, ccache, wfn, pot)
@@ -681,8 +679,19 @@ contains
       & cn=cn, cn_en=cn_en, dcndr=dcndr, dcndL=dcndL, dcn_endr=dcn_endr, dcn_endL=dcn_endL, &
       & selfenergy=selfenergy, dsedr=dsedr, dsedL=dsedL)    
       
+      ! Reset potential to zero for Coulomb
+      call pot%reset
+            
+      ! Use the electronegativity-weighted CN as a 0th order guess for the charges
+      call get_effective_q(mol, calc%bas, cn_en, wfn%qat, wfn%qsh, &
+         & dcn_endr, dcn_endL, wfn%dqatdr, wfn%dqatdL, wfn%dqshdr, wfn%dqshdL)
+            
+      call calc%coulomb%update(mol, ccache)
+      call calc%coulomb%get_potential(mol, ccache, wfn, pot)
+      call calc%coulomb%get_potential_gradient(mol, ccache, wfn, pot)
+
       call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
-         & dsedr, dsedL, pot, dummy_pmat, dh0dr, dh0dL, doverlap, doverlap_diat)
+         & dsedr, dsedL, pot, doverlap, doverlap_diat, dh0dr, dh0dL)
 
       num: do ic = 1, 3
          !call write_2d_matrix(numdr(ic,:,:), "num H")
@@ -831,7 +840,7 @@ contains
       real(wp), allocatable :: densityr(:, :), densityl(:, :)
       real(wp), allocatable :: numdr(:, :, :, :)
 
-      real(wp), allocatable :: ql(:), qr(:), dqdr(:, :, :), dqdL(:, :, :)
+      real(wp), allocatable :: ql(:), qr(:), dqdr(:, :, :, :), dqdL(:, :, :, :)
       real(wp), allocatable :: numqdr(:, :, :)
 
 
@@ -864,7 +873,7 @@ contains
 
             mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
             call new_ceh_calculator(calc, mol)
-            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
             ctx%verbosity = 0
             wfn%density(:,:,1) = 0.0_wp
             wfn%coeff(:,:,1) = 0.0_wp
@@ -877,7 +886,7 @@ contains
 
             mol%xyz(ic, iat) = mol%xyz(ic, iat) - 2*step
             call new_ceh_calculator(calc, mol)
-            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
 
             ctx%verbosity = 0
             wfn%density(:,:,1) = 0.0_wp
@@ -924,7 +933,7 @@ contains
 
       ! Analytical gradient
       call new_ceh_calculator(calc, mol)
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .true.)
       ctx%verbosity = 0
       write(*,*) "before the analytical q with analytical P!"
       call ceh_guess(ctx, calc, mol, error, wfn, accuracy, .true.)
@@ -977,7 +986,7 @@ contains
 
 
       !> Get initial potential
-      call new_potential(pot, mol, calc%bas, 1)
+      call new_potential(pot, mol, calc%bas, 1, .true.)
       !> Set potential to zero
       call pot%reset
 
@@ -1019,9 +1028,9 @@ contains
                & overlap, overlap_diat, dpint, hamiltonian)
 
       call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
-         & dsedr, dsedL, pot, dummy_pmat, dh0dr, dh0dL, doverlap, doverlap_diat)
+         & dsedr, dsedL, pot, doverlap, doverlap_diat, dh0dr, dh0dL)
 
-      allocate(ql(mol%nat), qr(mol%nat), dqdr(3, mol%nat, mol%nat), dqdL(3, 3, mol%nat), &
+      allocate(ql(mol%nat), qr(mol%nat), dqdr(3, mol%nat, mol%nat,1), dqdL(3, 3, mol%nat,1), &
       & numqdr(3, mol%nat, mol%nat), source = 0.0_wp)
       
       ! Derivative of the CEH Mulliken charges
@@ -1044,7 +1053,7 @@ contains
             mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
 
             call new_ceh_calculator(calc, mol)
-            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
             ctx%verbosity = 0
             call ceh_guess(ctx, calc, mol, error, wfn, accuracy, .false.)
             qr = wfn%qat(:,1)
@@ -1054,7 +1063,7 @@ contains
             mol%xyz(ic, iat) = mol%xyz(ic, iat) - 2*step
 
             call new_ceh_calculator(calc, mol)
-            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
             ctx%verbosity = 0
             call ceh_guess(ctx, calc, mol, error, wfn, accuracy, .false.)
             ql = wfn%qat(:,1)
@@ -1069,11 +1078,11 @@ contains
 
 
       do ic = 1, 3
-         call write_2d_matrix(dqdr(ic,:,:), "ana charge")
+         call write_2d_matrix(dqdr(ic,:,:,1), "ana charge")
          call write_2d_matrix(numqdr(ic,:,:), "num charge")
          do ii = 1, mol%nat
             do jj = 1, mol%nat
-               call check(error, dqdr(ic,ii,jj), numqdr(ic,ii,jj), thr=1e-6_wp)
+               call check(error, dqdr(ic,ii,jj,1), numqdr(ic,ii,jj), thr=1e-6_wp)
                if (allocated(error)) then
                   call test_failed(error, "Derivative of charges does not match")
                   !return
@@ -1108,7 +1117,7 @@ contains
       allocate(cn(mol%nat))
 
       call new_ceh_calculator(calc, mol)
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
       ctx%verbosity = 0
       call ceh_guess(ctx, calc, mol, error, wfn, accuracy, .false.)
 
@@ -1148,7 +1157,7 @@ contains
             mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
 
             call new_ceh_calculator(calc, mol)
-            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
             ctx%verbosity = 0
             call ceh_guess(ctx, calc, mol, error, wfn, accuracy, .false.)
             qr = wfn%qat(:,1)
@@ -1158,7 +1167,7 @@ contains
             mol%xyz(ic, iat) = mol%xyz(ic, iat) - 2*step
 
             call new_ceh_calculator(calc, mol)
-            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
             ctx%verbosity = 0
             call ceh_guess(ctx, calc, mol, error, wfn, accuracy, .false.)
             ql = wfn%qat(:,1)
@@ -1173,20 +1182,20 @@ contains
 
       ! Analytical gradient
       call new_ceh_calculator(calc, mol)
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .true.)
       ctx%verbosity = 0
       call ceh_guess(ctx, calc, mol, error, wfn, accuracy, .true.)
       if (allocated(error)) return
 
       do ic = 1, 3
-         call write_2d_matrix(wfn%dqdr(ic,:,:), "ana")
+         call write_2d_matrix(wfn%dqatdr(ic,:,:,1), "ana")
          call write_2d_matrix(numdr(ic,:,:), "num")
          do i = 1, mol%nat
             do j = 1, mol%nat
-               call check(error, wfn%dqdr(ic,i,j), numdr(ic,i,j), thr=1e-6_wp)
+               call check(error, wfn%dqatdr(ic,i,j,1), numdr(ic,i,j), thr=1e-6_wp)
                if (allocated(error)) then
-                  !print '(3es21.13)',  wfn%dqdr(ic,i,j), numdr(ic,i,j), &
-                  !& wfn%dqdr(ic,i,j) - numdr(ic,i,j)
+                  !print '(3es21.13)',  wfn%dqatdr(ic,i,j), numdr(ic,i,j), &
+                  !& wfn%dqatdr(ic,i,j) - numdr(ic,i,j)
                   call test_failed(error, "Derivative of charges does not match")
                   !return
                end if
@@ -2177,7 +2186,7 @@ contains
       call get_structure(mol, "MB16-43", "01")
       mol%charge = 2.0_wp
       call new_ceh_calculator(calc, mol)
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
       cont = electric_field(efield)
       call calc%push_back(cont)
       ctx%verbosity = 0
@@ -2209,7 +2218,7 @@ contains
       call get_structure(mol, "MB16-43", "01")
 
       call new_ceh_calculator(calc, mol)
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
       ctx%verbosity = 0
       call ceh_guess(ctx, calc, mol, error, wfn, accuracy, .false.)
       tmp = 0.0_wp
@@ -2250,7 +2259,7 @@ contains
       efield(2) = 0.2_wp
 
       call new_ceh_calculator(calc, mol)
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
 
       cont = electric_field(efield)
       call calc%push_back(cont)
@@ -2301,7 +2310,7 @@ contains
       efield = 0.0_wp
       efield(1) = -0.1_wp
       call new_ceh_calculator(calc1, mol1)
-      call new_wavefunction(wfn1, mol1%nat, calc1%bas%nsh, calc1%bas%nao, 1, kt)
+      call new_wavefunction(wfn1, mol1%nat, calc1%bas%nsh, calc1%bas%nao, 1, kt, .false.)
       cont1 = electric_field(efield)
       call calc1%push_back(cont1)
       call ceh_guess(ctx, calc1, mol1, error, wfn1, accuracy, .false.)
@@ -2313,7 +2322,7 @@ contains
       xyz(1, :) = xyz(1, :) - 1.0_wp
       call new(mol2, num, xyz)
       call new_ceh_calculator(calc2, mol2)
-      call new_wavefunction(wfn2, mol2%nat, calc2%bas%nsh, calc2%bas%nao, 1, kt)
+      call new_wavefunction(wfn2, mol2%nat, calc2%bas%nsh, calc2%bas%nao, 1, kt, .false.)
       cont2 = electric_field(efield)
       call calc2%push_back(cont2)
       call ceh_guess(ctx, calc2, mol2, error, wfn2, accuracy, .false.)
