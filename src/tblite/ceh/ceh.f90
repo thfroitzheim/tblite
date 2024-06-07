@@ -37,7 +37,7 @@ module tblite_ceh_ceh
    implicit none
    private
 
-   public :: ceh_h0spec, new_ceh_calculator, get_effective_q
+   public :: ceh_h0spec, new_ceh_calculator, get_effective_qat
 
    integer, parameter, private :: max_elem = 103
    integer, parameter, private :: max_shell = 4
@@ -1265,8 +1265,8 @@ contains
 
 
    !> Build effective charges from the electronegativity-weighted CN
-   subroutine get_effective_q(mol, bas, cn_en, qat, qsh, &
-      & dcn_endr, dcn_endL, dqatdr, dqatdL, dqshdr, dqshdL)
+   subroutine get_effective_qat(mol, bas, cn_en, qat, &
+      & dcn_endr, dcn_endL, dqatdr, dqatdL)
       !> Molecular structure data
       type(structure_type), intent(in) :: mol
       !> Basis set information
@@ -1275,16 +1275,12 @@ contains
       real(wp), intent(in) :: cn_en(:)
       !> Effective atomic charges, shape: [nat, spin]
       real(wp), intent(out) :: qat(:, :)
-      !> Effective shell charges, shape: [nsh, spin]
-      real(wp), intent(out) :: qsh(:, :)
       !> Position and lattice vector gradient of cn_en, shape: [3, nat/3, nat]
       real(wp), intent(in), optional :: dcn_endr(:, :, :), dcn_endL(:, :, :)
       !> Position and lattice vector gradient of qat, shape: [3, nat/3, nat, spin]
       real(wp), intent(out), optional :: dqatdr(:, :, :, :), dqatdL(:, :, :, :)
-      !> Position and lattice vector gradient of qsh, shape: [3, nat/3, nsh, spin]
-      real(wp), intent(out), optional :: dqshdr(:, :, :, :), dqshdL(:, :, :, :)
 
-      integer :: iat, is, ish, isp, izp, ispin, nsh
+      integer :: iat, isp, izp, ispin
 
       qat(:, :) = 0.0_wp
       if (present(dqatdr)) dqatdr(:,:,:,:) = 0.0_wp
@@ -1293,44 +1289,28 @@ contains
       if (present(dqatdr) .and. present(dqatdL)) then
          do ispin = 1, size(qat, 2)
             do iat = 1, size(qat, 1)
-               is = bas%ish_at(iat)
                isp = mol%id(iat)
                izp = mol%num(isp)
-               nsh = bas%nsh_id(isp)
 
                qat(iat, ispin) = p_ceh_en_to_q(izp)*cn_en(iat) &
                & + p_ceh_total_to_q * mol%charge/dble(mol%nat)
                dqatdr(:,:,iat, ispin) = p_ceh_en_to_q(izp) * dcn_endr(:,:,iat)
                dqatdL(:,:,iat, ispin) = p_ceh_en_to_q(izp) * dcn_endL(:,:,iat)
-
-               ! distribute to shells
-               do ish = 1, nsh 
-                  qsh(is+ish, ispin) = qat(iat, ispin) / dble(nsh)
-                  dqshdr(:,:,is+ish, ispin) = dqatdr(:,:,iat, ispin) / dble(nsh)
-                  dqshdr(:,:,is+ish, ispin) = dqatdr(:,:,iat, ispin) / dble(nsh)
-               end do
             end do
          end do
       else
          do ispin = 1, size(qat, 2)
             do iat = 1, size(qat, 1)
-               is = bas%ish_at(iat)
                isp = mol%id(iat)
                izp = mol%num(isp)
-               nsh = bas%nsh_id(isp)
 
                qat(iat, ispin) = p_ceh_en_to_q(izp)*cn_en(iat) &
                & + p_ceh_total_to_q * mol%charge/dble(mol%nat)
-               
-               ! distribute to shells
-               do ish = 1, nsh 
-                  qsh(is+ish, ispin) = qat(iat, ispin) / dble(nsh)
-               end do
             end do
          end do
       end if 
    
-   end subroutine get_effective_q
+   end subroutine get_effective_qat
 
 
 end module tblite_ceh_ceh

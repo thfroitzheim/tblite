@@ -198,7 +198,7 @@ subroutine get_potential_gradient(self, mol, cache, wfn, pot)
    !> Density dependent potential
    type(potential_type), intent(inout) :: pot
 
-   integer :: ic, id, iat, ndim
+   integer :: ic, id, iat, ndim, jat
    real(wp), allocatable :: dadr(:, :, :), dadL(:, :, :), datr(:, :)
    type(coulomb_cache), pointer :: ptr
 
@@ -211,19 +211,32 @@ subroutine get_potential_gradient(self, mol, cache, wfn, pot)
    call self%get_coulomb_derivs(mol, ptr, wfn%qat(:, 1), wfn%qsh(:, 1), dadr, dadL, datr)
 
    if(.not. self%shell_resolved) then
+      pot%dvatdr(:, :, :, 1) = dadr
+      do iat = 1, mol%nat
+         do jat = 1, mol%nat
+            pot%dvatdr(:, iat, iat, 1) = pot%dvatdr(:, iat, iat, 1) + dadr(:, iat, jat) 
+         end do
+      end do
+      
       do ic = 1, 3 
-         do iat = 1, mol%nat
-            ! Charge derivative
-            call symv(ptr%amat, wfn%dqatdr(ic, iat, :, 1), pot%dvatdr(ic, iat, :, 1), beta=1.0_wp)
-            ! Hubbard derivative
-            pot%dvatdr(ic, iat, :, 1) = pot%dvatdr(ic, iat, :, 1) + dadr(ic, iat, :) * wfn%qat(:, 1)
-         end do
-         do id = 1, 3
-            ! Charge derivative
-            call symv(ptr%amat, wfn%dqatdL(ic, id, :, 1), pot%dvatdL(ic, id, :, 1), beta=1.0_wp)
-            pot%dvatdL(ic, id, :, 1) = pot%dvatdL(ic, id, :, 1) + dadL(ic, id, :) * wfn%qat(:, 1)
-         end do
-         
+        do iat = 1, mol%nat
+           ! Charge derivative
+           call symv(ptr%amat, wfn%dqatdr(ic, iat, :, 1), pot%dvatdr(ic, iat, :, 1), beta=1.0_wp)
+           ! ! Hubbard derivative
+           ! call gemv(dadr, wfn%qat(:, 1), pot%dvatdr(:, :, iat, 1), beta=1.0_wp)
+
+           !pot%dvatdr(:, :, iat, 1) = dadr
+           ! do jat = 1, mol%nat
+           !    pot%dvatdr(ic, iat, iat, 1) = pot%dvatdr(ic, iat, iat, 1) + dadr(ic, iat, jat) * wfn%qat(jat, 1)
+           !    pot%dvatdr(ic, iat, jat, 1) = pot%dvatdr(ic, iat, jat, 1) + dadr(ic, iat, jat) * wfn%qat(jat, 1)
+           ! end do 
+        end do
+        !do id = 1, 3
+        !   ! Charge derivative
+        !   call symv(ptr%amat, wfn%dqatdL(ic, id, :, 1), pot%dvatdL(ic, id, :, 1), beta=1.0_wp)
+        !   ! Hubbard derivative
+        !   pot%dvatdL(ic, id, :, 1) = pot%dvatdL(ic, id, :, 1) + dadL(ic, id, :) * wfn%qat(:, 1)
+        !end do
       end do
    end if
 

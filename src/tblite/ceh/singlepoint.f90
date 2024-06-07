@@ -41,7 +41,7 @@ module tblite_ceh_singlepoint
    use tblite_ceh_h0, only : get_hamiltonian, get_hamiltonian_gradient, &
    & get_scaled_selfenergy, get_occupation
    use tblite_ceh_coupled_perturbed, only : get_density_matrix_gradient
-   use tblite_ceh_ceh, only : get_effective_q
+   use tblite_ceh_ceh, only : get_effective_qat
    use tblite_xtb_spec, only : tb_h0spec 
    use tblite_xtb_calculator, only : xtb_calculator
    use tblite_timer, only : timer_type, format_time
@@ -191,8 +191,9 @@ contains
       if (allocated(calc%coulomb)) then
          call timer%push("coulomb")
          ! Use the electronegativity-weighted CN as a 0th order guess for the charges
-         call get_effective_q(mol, calc%bas, cn_en, wfn%qat, wfn%qsh, &
-         & dcn_endr, dcn_endL, wfn%dqatdr, wfn%dqatdL, wfn%dqshdr, wfn%dqshdL)
+         call get_effective_qat(mol, calc%bas, cn_en, wfn%qat, &
+         & dcn_endr, dcn_endL, wfn%dqatdr, wfn%dqatdL)
+         write(*,*) "in ceh_guess qat", wfn%qat
          !wfn%qsh = 0.0_wp
          call calc%coulomb%update(mol, ccache)
          call calc%coulomb%get_potential(mol, ccache, wfn, pot)
@@ -204,6 +205,8 @@ contains
 
       ! Add effective Hamiltonian to wavefunction
       call add_pot_to_h1(calc%bas, ints, pot, wfn%coeff)
+
+      write(*,*) "pot%vao", pot%vao
 
       ! Solve the effective Hamiltonian
       call ctx%new_solver(solver, calc%bas%nao)

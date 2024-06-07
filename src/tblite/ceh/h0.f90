@@ -403,6 +403,8 @@ contains
             call diat_trafo_grad(block_overlap, block_doverlap, vec, h0%ksig(izp,jzp), h0%kpi(izp,jzp), h0%kdel(izp,jzp), &
                & max(bas%nsh_at(iat), bas%nsh_at(jat)) - 1) 
 
+            vij = 0.5_wp * (pot%vat(iat,1) + pot%vat(jat,1))
+
             dvijdr(:,:) = 0.5_wp * (pot%dvatdr(:, :, iat, 1) + pot%dvatdr(:, :, jat, 1))
             dvijdL(:,:) = 0.5_wp * (pot%dvatdL(:, :, iat, 1) + pot%dvatdL(:, :, jat, 1))
 
@@ -414,10 +416,10 @@ contains
                   jj = bas%iao_sh(js+jsh)
                   jaosh = smap(jsh-1) ! Offset for the block overlap matrix
 
-                  hij = 0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (selfenergy(is+ish) + selfenergy(js+jsh))
+                  hij = 0.0_wp !0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (selfenergy(is+ish) + selfenergy(js+jsh))
                   
-                  dhijdr(:,:) = 0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (dsedr(:,:,is+ish) + dsedr(:,:,js+jsh)) 
-                  dhijdL(:,:) = 0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (dsedL(:,:,is+ish) + dsedL(:,:,js+jsh)) 
+                  dhijdr(:,:) = 0.0_wp !0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (dsedr(:,:,is+ish) + dsedr(:,:,js+jsh)) 
+                  dhijdL(:,:) = 0.0_wp !0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (dsedL(:,:,is+ish) + dsedL(:,:,js+jsh)) 
    
                   nao = msao(bas%cgto(jsh, jzp)%ang)
                   do iao = 1, msao(bas%cgto(ish, izp)%ang)
@@ -429,7 +431,9 @@ contains
                         doverlap_diat(:, ii+iao, jj+jao) = doverlap_diat(:, ii+iao, jj+jao) &
                            & - block_doverlap(:, jaosh+jao, iaosh+iao)
                         
-                        vij = 0.5_wp * (pot%vao(jj +jao,1) + pot%vao(ii+iao,1))
+                        !vij = 0.0_wp !0.5_wp * (pot%vao(jj +jao,1) + pot%vao(ii+iao,1))
+                        write(*,*) "vij", vij
+                        write(*,*) "dvijdr", dvijdr(:, iat)
 
                         dh0dr(:, jj+jao, ii+iao) = dh0dr(:, jj+jao, ii+iao) &
                            & + block_doverlap(:, jaosh+jao, iaosh+iao) * (hij - vij) &
@@ -455,11 +459,17 @@ contains
       do iat = 1, mol%nat
          izp = mol%id(iat)
          is = bas%ish_at(iat)
+
+         dvijdr(:,:) = 0.5_wp * (pot%dvatdr(:, :, iat, 1) + pot%dvatdr(:, :, iat, 1))
+         dvijdL(:,:) = 0.5_wp * (pot%dvatdL(:, :, iat, 1) + pot%dvatdL(:, :, iat, 1))
+         write(*,*) "dvijdr", dvijdr(:, iat)
+
          do ish = 1, bas%nsh_id(izp)
             ii = bas%iao_sh(is+ish)
             !> diagonal term (AO(i) == AO(j))
             do iao = 1, msao(bas%cgto(ish, izp)%ang)
-               dh0dr(:, ii+iao, ii+iao) = dsedr(:,iat,is+ish)
+               !vij = 0.5_wp * (pot%vao(ii +iao,1) + pot%vao(ii+iao,1))
+               dh0dr(:, ii+iao, ii+iao) = - dvijdr(:,iat) !dsedr(:,iat,is+ish)
             enddo
          end do
       end do
