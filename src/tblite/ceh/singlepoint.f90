@@ -24,7 +24,7 @@ module tblite_ceh_singlepoint
    use mctc_io, only: structure_type
    use tblite_adjlist, only : adjacency_list, new_adjacency_list
    use tblite_cutoff, only : get_lattice_points
-   use tblite_basis_type, only : basis_type, get_cutoff
+   use tblite_basis_type, only : get_cutoff
    use tblite_context, only : context_type
    use tblite_output_format, only: format_string
    use tblite_integral_type, only : integral_type, new_integral
