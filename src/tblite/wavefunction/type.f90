@@ -70,14 +70,14 @@ module tblite_wavefunction_type
       !> Derivative of the density matrix  w.r.t. the lattice vectors: [3, nao, nao, spin]
       real(wp), allocatable :: ddensitydL(:, :, :, :)
 
-      !> Derivative of CEH chargs w.r.t. the positions: [3, nat, nat, spin]
+      !> Derivative of atomic charges w.r.t. the positions: [3, nat, nat, spin]
       real(wp), allocatable :: dqatdr(:, :, :, :)
-      !> Derivative of CEH chargs w.r.t. the lattice vectors: [3, 3, nat, spin]
+      !> Derivative of atomic charges w.r.t. the lattice vectors: [3, 3, nat, spin]
       real(wp), allocatable :: dqatdL(:, :, :, :)
 
-      !> Derivative of CEH chargs w.r.t. the positions: [3, nat, nsh, spin]
+      !> Derivative of shell charges w.r.t. the positions: [3, nat, nsh, spin]
       real(wp), allocatable :: dqshdr(:, :, :, :)
-      !> Derivative of CEH chargs w.r.t. the lattice vectors: [3, 3, nsh, spin]
+      !> Derivative of shell charges w.r.t. the lattice vectors: [3, 3, nsh, spin]
       real(wp), allocatable :: dqshdL(:, :, :, :)
 
    end type wavefunction_type

@@ -191,7 +191,7 @@ contains
       if (allocated(calc%coulomb)) then
          call timer%push("coulomb")
          ! Use the electronegativity-weighted CN as a 0th order guess for the charges
-         call get_effective_qat(mol, calc%bas, cn_en, wfn%qat, &
+         call get_effective_qat(mol, cn_en, wfn%qat, &
          & dcn_endr, dcn_endL, wfn%dqatdr, wfn%dqatdL)
          write(*,*) "in ceh_guess qat", wfn%qat
          !wfn%qsh = 0.0_wp
@@ -206,6 +206,8 @@ contains
       ! Add effective Hamiltonian to wavefunction
       call add_pot_to_h1(calc%bas, ints, pot, wfn%coeff)
 
+      write(*,*) "pot%vat", pot%vat
+      write(*,*) "pot%vsh", pot%vsh
       write(*,*) "pot%vao", pot%vao
 
       ! Solve the effective Hamiltonian

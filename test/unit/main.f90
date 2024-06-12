@@ -60,7 +60,7 @@ program tester
       !new_testsuite("solvation-born", collect_solvation_born), &
       !new_testsuite("solvation-cpcm", collect_solvation_cpcm), &
       !new_testsuite("solvation-surface", collect_solvation_surface), &
-      !new_testsuite("coulomb-charge", collect_coulomb_charge), &
+      new_testsuite("coulomb-charge", collect_coulomb_charge), &
       !new_testsuite("coulomb-multipole", collect_coulomb_multipole), &
       !new_testsuite("double-dictionary", collect_double_dictionary), &
       !new_testsuite("post-processing", collect_post_processing), &

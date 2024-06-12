@@ -431,7 +431,7 @@ contains
                         doverlap_diat(:, ii+iao, jj+jao) = doverlap_diat(:, ii+iao, jj+jao) &
                            & - block_doverlap(:, jaosh+jao, iaosh+iao)
                         
-                        !vij = 0.0_wp !0.5_wp * (pot%vao(jj +jao,1) + pot%vao(ii+iao,1))
+                        
                         write(*,*) "vij", vij
                         write(*,*) "dvijdr", dvijdr(:, iat)
 

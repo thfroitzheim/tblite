@@ -1265,12 +1265,10 @@ contains
 
 
    !> Build effective charges from the electronegativity-weighted CN
-   subroutine get_effective_qat(mol, bas, cn_en, qat, &
+   subroutine get_effective_qat(mol, cn_en, qat, &
       & dcn_endr, dcn_endL, dqatdr, dqatdL)
       !> Molecular structure data
       type(structure_type), intent(in) :: mol
-      !> Basis set information
-      type(basis_type), intent(in) :: bas
       !> Electronegativity weighted CN, shape: [nat]
       real(wp), intent(in) :: cn_en(:)
       !> Effective atomic charges, shape: [nat, spin]

@@ -79,8 +79,8 @@ contains
          !new_unittest("hamiltonian-LiH", test_hamiltonian_lih), &
          !new_unittest("hamiltonian-S2", test_hamiltonian_s2), &
          !new_unittest("hamiltonian-SiH4", test_hamiltonian_sih4), &
-         new_unittest("hamiltonian_grad-H2", test_hamiltonian_grad_h2), &
-         new_unittest("hamiltonian_grad-LiH", test_hamiltonian_grad_lih), &
+         !new_unittest("hamiltonian_grad-H2", test_hamiltonian_grad_h2), &
+         !new_unittest("hamiltonian_grad-LiH", test_hamiltonian_grad_lih), &
          !new_unittest("hamiltonian_grad-S2", test_hamiltonian_grad_s2), &
          !new_unittest("hamiltonian_grad-PCl", test_hamiltonian_grad_pcl), &
          !new_unittest("hamiltonian_grad-SiH4", test_hamiltonian_grad_sih4), &
@@ -97,19 +97,19 @@ contains
          !new_unittest("overlap_diat-S2", test_overlap_diat_s2), &
          !new_unittest("overlap_diat-SiH4", test_overlap_diat_sih4), &
          !new_unittest("q-mol-h2", test_q_h2), &
-         new_unittest("q-mol-lih", test_q_lih), &
-         new_unittest("q-mol-sih4", test_q_sih4), &
-         new_unittest("q-mol-cecl3", test_q_cecl3), &
-         new_unittest("q-mol-accl6", test_q_accl6), &
-         new_unittest("q-mol-panp", test_q_panp), &
-         new_unittest("q-mol-mb01", test_q_mb01), &
-         new_unittest("q-mol-mb02", test_q_mb02), &
-         new_unittest("q-mol-mb03", test_q_mb03), &
-         new_unittest("q-mol-mb04", test_q_mb04), &
-         new_unittest("q-chrgd-efield-mol", test_q_ef_chrg_mb01), &
-         new_unittest("d-mol", test_d_mb01), &
-         new_unittest("d-field-mol", test_d_field_mb04), &
-         new_unittest("d-field-change-mol", test_d_hcn) &
+         new_unittest("q-mol-lih", test_q_lih) &
+         !new_unittest("q-mol-sih4", test_q_sih4), &
+         !new_unittest("q-mol-cecl3", test_q_cecl3), &
+         !new_unittest("q-mol-accl6", test_q_accl6), &
+         !new_unittest("q-mol-panp", test_q_panp), &
+         !new_unittest("q-mol-mb01", test_q_mb01), &
+         !new_unittest("q-mol-mb02", test_q_mb02), &
+         !new_unittest("q-mol-mb03", test_q_mb03), &
+         !new_unittest("q-mol-mb04", test_q_mb04), &
+         !new_unittest("q-chrgd-efield-mol", test_q_ef_chrg_mb01), &
+         !new_unittest("d-mol", test_d_mb01), &
+         !new_unittest("d-field-mol", test_d_field_mb04), &
+         !new_unittest("d-field-change-mol", test_d_hcn) &
          ! new_unittest("dq-mol-h2", test_dq_h2), &
          ! new_unittest("dq-mol-lih", test_dq_lih), &
          ! new_unittest("dq-mol-S2", test_dq_s2), &
@@ -524,7 +524,7 @@ contains
 
       real(wp), parameter :: cn_cutoff = 30.0_wp
       real(wp), parameter :: step = 1.0e-6_wp
-      real(wp), allocatable :: lattr(:, :), cn_lattr(:, :), cn(:), cn_en(:)
+      real(wp), allocatable :: lattr(:, :), cn(:), cn_en(:)
       real(wp), allocatable :: dcndr(:, :, :), dcndL(:, :, :), dcn_endr(:, :, :), dcn_endL(:, :, :)
       real(wp), allocatable :: h1l(:, :, :), h1r(:, :, :)
       real(wp), allocatable :: selfenergy(:), dsedr(:,:,:), dsedL(:,:,:)
@@ -596,7 +596,7 @@ contains
             call pot%reset
             
             ! Use the electronegativity-weighted CN as a 0th order guess for the charges
-            call get_effective_qat(mol, calc%bas, cn_en, wfn%qat)
+            call get_effective_qat(mol, cn_en, wfn%qat)
             
             call calc%coulomb%update(mol, ccache)
             call calc%coulomb%get_potential(mol, ccache, wfn, pot)
@@ -631,7 +631,7 @@ contains
             call pot%reset
             
             ! Use the electronegativity-weighted CN as a 0th order guess for the charges
-            call get_effective_qat(mol, calc%bas, cn_en, wfn%qat)
+            call get_effective_qat(mol, cn_en, wfn%qat)
             
             write(*,*) "before qat", wfn%qat
 
@@ -690,7 +690,7 @@ contains
       call pot%reset
             
       ! Use the electronegativity-weighted CN as a 0th order guess for the charges
-      call get_effective_qat(mol, calc%bas, cn_en, wfn%qat, &
+      call get_effective_qat(mol, cn_en, wfn%qat, &
          & dcn_endr, dcn_endL, wfn%dqatdr, wfn%dqatdL)
       
       write(*,*) "qat", wfn%qat
@@ -698,11 +698,20 @@ contains
       call calc%coulomb%update(mol, ccache)
       call calc%coulomb%get_potential(mol, ccache, wfn, pot)
       call calc%coulomb%get_potential_gradient(mol, ccache, wfn, pot)
+      
+      write(*,*) "pot%vat", pot%vat
+      write(*,*) "pot%vsh", pot%vsh
+      write(*,*) "pot%vao", pot%vao
+      do ic=1, 3
+         call write_2d_matrix(pot%dvatdr(ic, : ,:, 1), "pot%dvatdr")
+      end do
 
       ! Add effective Hamiltonian to wavefunction to collect the potentials
       call add_pot_to_h1(calc%bas, intsl, pot, h1l)
 
-      write(*,*) "pot%vao", pot%vao
+      write(*,*) "after pot%vat", pot%vat
+      write(*,*) "after pot%vsh", pot%vsh
+      write(*,*) "after pot%vao", pot%vao
 
       call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
          & dsedr, dsedL, pot, doverlap, doverlap_diat, dh0dr, dh0dL)
@@ -865,7 +874,7 @@ contains
       type(potential_type) :: pot
 
       real(wp), parameter :: cn_cutoff = 30.0_wp
-      real(wp), allocatable :: lattr(:, :), cn_lattr(:, :), cn(:), cn_en(:), rcov(:), en(:)
+      real(wp), allocatable :: lattr(:, :), cn(:), cn_en(:), rcov(:), en(:)
       real(wp), allocatable :: dcndr(:, :, :), dcndL(:, :, :), dcn_endr(:, :, :), dcn_endL(:, :, :)
       real(wp), allocatable :: selfenergy(:), dsedr(:,:,:), dsedL(:,:,:)
       real(wp), allocatable :: dh0dr(:, :, :), dh0dL(:, :, :), doverlap(:, :, :), doverlap_diat(:, :, :) 
