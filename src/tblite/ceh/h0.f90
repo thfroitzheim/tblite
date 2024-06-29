@@ -401,7 +401,7 @@ contains
 
             ! Diatomic frame transformation and scaling of the overlap gradient
             call diat_trafo_grad(block_overlap, block_doverlap, vec, h0%ksig(izp,jzp), h0%kpi(izp,jzp), h0%kdel(izp,jzp), &
-               & max(bas%nsh_at(iat), bas%nsh_at(jat)) - 1) 
+               & bas%nsh_at(jat)-1, bas%nsh_at(iat)-1)
 
             vij = 0.5_wp * (pot%vat(iat,1) + pot%vat(jat,1))
 

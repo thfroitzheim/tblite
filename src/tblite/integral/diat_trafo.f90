@@ -200,8 +200,7 @@ contains
    end subroutine diat_trafo_grad
 
 
-   !pure 
-   subroutine harmtr(maxl,vec,trafomat)
+   pure subroutine harmtr(maxl,vec,trafomat)
       !> Maximum angular momentum
       integer, intent(in)  :: maxl
       !> Normalized vector from atom k to atom l
@@ -342,8 +341,7 @@ contains
 
    end subroutine harmtr
 
-   !pure 
-   subroutine d_harmtr(maxl,vec,trafomat, dtrafomat)
+   pure subroutine d_harmtr(maxl,vec,trafomat, dtrafomat)
       !> Maximum angular momentum
       integer, intent(in)  :: maxl
       !> Normalized vector from atom k to atom l
