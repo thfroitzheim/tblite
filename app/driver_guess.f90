@@ -63,9 +63,8 @@ contains
       real(wp) :: dpmom(3), qpmom(6)
       real(wp), allocatable :: gradient(:, :), sigma(:, :)
       type(context_type) :: ctx
-      type(xtb_calculator) :: calc
-      type(xtb_calculator):: calc_ceh
-      type(wavefunction_type) :: wfn, wfn_ceh
+      type(xtb_calculator):: calc
+      type(wavefunction_type) :: wfn
 
       ctx%terminal = context_terminal(config%color)
       ctx%solver = lapack_solver(config%solver)
@@ -114,22 +113,16 @@ contains
       end if
       if (allocated(error)) return
 
-      nspin = 1
-      call new_gfn2_calculator(calc, mol)
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, nspin, config%etemp_guess * kt)
-
       method = "ceh"
       if (allocated(config%method)) method = config%method
-      if (method == "ceh") then
-         call new_ceh_calculator(calc_ceh, mol)
-         call new_wavefunction(wfn_ceh, mol%nat, calc_ceh%bas%nsh, calc_ceh%bas%nao, 1, config%etemp_guess * kt)
-      end if
+      call new_ceh_calculator(calc, mol)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, config%etemp_guess * kt)
 
       if (allocated(config%efield) .and. config%method == "ceh") then
          block
             class(container_type), allocatable :: cont
             cont = electric_field(config%efield*vatoau)
-            call calc_ceh%push_back(cont)
+            call calc%push_back(cont)
          end block
       end if
 
@@ -144,7 +137,7 @@ contains
             call ctx%message("Electronegativity equilibration (EEQ) guess")
             call ctx%message("")
          case("ceh")
-            call ctx%message(calc_ceh%info(config%verbosity, " | "))
+            call ctx%message(calc%info(config%verbosity, " | "))
          end select
       end if
 
@@ -156,7 +149,7 @@ contains
       case("eeq")
          call eeq_guess(mol, calc, wfn)
       case("ceh")
-         call ceh_guess(ctx, calc_ceh, mol, error, wfn_ceh, config%accuracy, config%verbosity)
+         call ceh_guess(ctx, calc, mol, error, wfn, config%accuracy, config%verbosity)
          if (ctx%failed()) then
             call fatal(ctx, "CEH singlepoint calculation failed")
             do while(ctx%failed())
@@ -165,9 +158,7 @@ contains
             end do
             error stop
          end if
-         wfn%qat(:, 1) = wfn_ceh%qat(:, 1)
          call shell_partition(mol, calc, wfn)
-         wfn%dpat(:, :, 1) = wfn_ceh%dpat(:, :, 1)
       end select
       if (allocated(error)) return
 
