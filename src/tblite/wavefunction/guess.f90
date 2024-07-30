@@ -48,7 +48,6 @@ subroutine sad_guess_qat(mol, charges, dpat)
    real(wp), intent(inout) :: charges(:), dpat(:, :)
 
    dpat = 0.0_wp
-   charges = 0.0_wp
    charges = mol%charge / mol%nat
 end subroutine sad_guess_qat
 
@@ -66,7 +65,6 @@ subroutine eeq_guess_qat(mol, charges, dpat)
    real(wp), intent(inout) :: charges(:), dpat(:, :)
 
    dpat = 0.0_wp
-   charges = 0.0_wp
    call get_eeq_charges(mol, charges)
 end subroutine eeq_guess_qat
 
