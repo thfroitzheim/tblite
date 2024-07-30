@@ -16,7 +16,7 @@
 
 !> Implementation of the driver entry points for the singlepoint runner
 module tblite_driver_guess
-   use, intrinsic :: iso_fortran_env, only : output_unit, error_unit, input_unit
+   use, intrinsic :: iso_fortran_env, only : error_unit, input_unit
    use mctc_env, only : error_type, fatal_error, wp
    use mctc_io, only : structure_type, read_structure, filetype
    use mctc_io_constants, only : codata
@@ -29,10 +29,8 @@ module tblite_driver_guess
    use tblite_lapack_solver, only : lapack_solver
    use tblite_output_ascii
    use tblite_wavefunction, only : wavefunction_type, new_wavefunction, &
-   & sad_guess, eeq_guess, get_molecular_dipole_moment, get_molecular_quadrupole_moment, &
-   & shell_partition
-   use tblite_xtb_calculator, only : xtb_calculator, new_xtb_calculator
-   use tblite_xtb_gfn2, only : new_gfn2_calculator
+   & sad_guess, eeq_guess, get_molecular_dipole_moment
+   use tblite_xtb_calculator, only : xtb_calculator
    use tblite_ceh_singlepoint, only : ceh_singlepoint
    use tblite_ceh_ceh, only : new_ceh_calculator
 

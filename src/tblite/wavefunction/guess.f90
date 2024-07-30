@@ -19,7 +19,7 @@
 
 !> Implementation of the guess wavefunctions
 module tblite_wavefunction_guess
-   use mctc_env, only : wp, error_type, fatal_error
+   use mctc_env, only : wp, error_type
    use mctc_io, only : structure_type
    use tblite_disp_d4, only : get_eeq_charges
    use tblite_wavefunction_type, only : wavefunction_type
