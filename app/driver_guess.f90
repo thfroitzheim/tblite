@@ -33,7 +33,7 @@ module tblite_driver_guess
    & shell_partition
    use tblite_xtb_calculator, only : xtb_calculator, new_xtb_calculator
    use tblite_xtb_gfn2, only : new_gfn2_calculator
-   use tblite_ceh_singlepoint, only : ceh_guess
+   use tblite_ceh_singlepoint, only : ceh_singlepoint
    use tblite_ceh_ceh, only : new_ceh_calculator
 
    implicit none
@@ -59,12 +59,13 @@ contains
 
       type(structure_type) :: mol
       character(len=:), allocatable :: method, filename
-      integer :: unpaired, charge,nspin, unit
-      real(wp) :: dpmom(3), qpmom(6)
-      real(wp), allocatable :: gradient(:, :), sigma(:, :)
+      integer :: unpaired, charge, unit
+      real(wp) :: dpmom(3)
       type(context_type) :: ctx
-      type(xtb_calculator):: calc
-      type(wavefunction_type) :: wfn
+      type(xtb_calculator):: calc_ceh
+      type(wavefunction_type) :: wfn_ceh
+      real(wp), allocatable :: qat(:)
+      real(wp), allocatable :: dpat(:,:)
 
       ctx%terminal = context_terminal(config%color)
       ctx%solver = lapack_solver(config%solver)
@@ -115,14 +116,16 @@ contains
 
       method = "ceh"
       if (allocated(config%method)) method = config%method
-      call new_ceh_calculator(calc, mol)
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, config%etemp_guess * kt)
+      if (method == "ceh") then
+         call new_ceh_calculator(calc_ceh, mol, error)
+         call new_wavefunction(wfn_ceh, mol%nat, calc_ceh%bas%nsh, calc_ceh%bas%nao, 1, config%etemp_guess * kt)
+      end if
 
       if (allocated(config%efield) .and. config%method == "ceh") then
          block
             class(container_type), allocatable :: cont
             cont = electric_field(config%efield*vatoau)
-            call calc%push_back(cont)
+            call calc_ceh%push_back(cont)
          end block
       end if
 
@@ -137,19 +140,20 @@ contains
             call ctx%message("Electronegativity equilibration (EEQ) guess")
             call ctx%message("")
          case("ceh")
-            call ctx%message(calc%info(config%verbosity, " | "))
+            call ctx%message(calc_ceh%info(config%verbosity, " | "))
          end select
       end if
 
+      allocate(qat(mol%nat), dpat(3, mol%nat), source=0.0_wp)
       select case(method)
       case default
          call fatal_error(error, "Unknown method '"//method//"' requested")
       case("sad")
-         call sad_guess(mol, calc, wfn)
+         call sad_guess(mol, qat, dpat)
       case("eeq")
-         call eeq_guess(mol, calc, wfn)
+         call eeq_guess(mol, qat, dpat)
       case("ceh")
-         call ceh_guess(ctx, calc, mol, error, wfn, config%accuracy, config%verbosity)
+         call ceh_singlepoint(ctx, calc_ceh, mol, error, wfn_ceh, config%accuracy, config%verbosity)
          if (ctx%failed()) then
             call fatal(ctx, "CEH singlepoint calculation failed")
             do while(ctx%failed())
@@ -158,17 +162,18 @@ contains
             end do
             error stop
          end if
-         call shell_partition(mol, calc, wfn)
+         qat = wfn_ceh%qat(:, 1)
+         dpat = wfn_ceh%dpat(:, :, 1)
       end select
       if (allocated(error)) return
 
-      call get_molecular_dipole_moment(mol, wfn%qat(:, 1), wfn%dpat(:, :, 1), dpmom)
-      call ascii_atomic_charges(ctx%unit, 1, mol, wfn%qat(:, 1))
-      call ascii_dipole_moments(ctx%unit, 1, mol, wfn%dpat(:, :, 1), dpmom)
+      call get_molecular_dipole_moment(mol, qat, dpat, dpmom)
+      call ascii_atomic_charges(ctx%unit, 1, mol, qat)
+      call ascii_dipole_moments(ctx%unit, 1, mol, dpat, dpmom)
 
       if (config%json) then
          open(file=config%json_output, newunit=unit)
-         call json_results(unit, "  ", charges=wfn%qat(:, 1))
+         call json_results(unit, "  ", charges=qat)
          close(unit)
          if (config%verbosity > 0) then
             call info(ctx, "JSON dump of results written to '"//config%json_output//"'")
