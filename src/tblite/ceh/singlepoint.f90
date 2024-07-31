@@ -31,14 +31,16 @@ module tblite_ceh_singlepoint
    use tblite_wavefunction, only : wavefunction_type, &
    & get_alpha_beta_occupation
    use tblite_wavefunction_mulliken, only: get_mulliken_shell_charges, &
-   & get_mulliken_atomic_multipoles
+   & get_mulliken_atomic_multipoles, get_mulliken_atomic_charges_gradient
    use tblite_scf_iterator, only: get_density, get_qat_from_qsh
    use tblite_scf, only: new_potential, potential_type 
    use tblite_container, only : container_cache
    use tblite_scf_potential, only: add_pot_to_h1
    use tblite_scf_solver, only : solver_type
    use tblite_blas, only : gemv
-   use tblite_ceh_h0, only : get_hamiltonian, get_scaled_selfenergy, get_occupation
+   use tblite_ceh_h0, only : get_hamiltonian, get_hamiltonian_gradient, &
+   & get_scaled_selfenergy, get_occupation
+   use tblite_ceh_coupled_perturbed, only : get_density_matrix_gradient
    use tblite_ceh_ceh, only : get_effective_qat
    use tblite_xtb_spec, only : tb_h0spec 
    use tblite_xtb_calculator, only : xtb_calculator
@@ -61,7 +63,7 @@ contains
 
 
    !> Run the CEH calculation (equivalent to xtb_singlepoint)
-   subroutine ceh_singlepoint(ctx, calc, mol, wfn, accuracy, verbosity)
+   subroutine ceh_singlepoint(ctx, calc, mol, wfn, accuracy, grad, verbosity)
       !> Calculation context
       type(context_type), intent(inout) :: ctx
       !> CEH calculator
@@ -72,6 +74,8 @@ contains
       type(wavefunction_type), intent(inout) :: wfn
       !> Accuracy for computation
       real(wp), intent(in) :: accuracy
+      !> Flag for gradient computation
+      logical, intent(in) :: grad
       !> Verbosity level of output
       integer, intent(in), optional :: verbosity
 
@@ -92,17 +96,20 @@ contains
       ! Error container
       type(error_type), allocatable :: error
       
-      logical :: grad
       real(wp) :: elec_entropy
       real(wp) :: nel, cutoff
       real(wp), allocatable :: tmp(:)
 
       integer :: i, prlevel
 
-      ! coordination number related arrays
+      ! Coordination number related arrays
       real(wp), allocatable :: cn(:), dcndr(:, :, :), dcndL(:, :, :), cn_en(:), dcn_endr(:, :, :), dcn_endL(:, :, :)
-      ! self energy related arrays
-      real(wp), allocatable :: selfenergy(:), dsedcn(:), dsedcn_en(:), lattr(:, :)
+      ! Self energy related arrays
+      real(wp), allocatable :: selfenergy(:), dsedr(:,:,:), dsedL(:,:,:) 
+      ! Periodicity
+      real(wp), allocatable :: lattr(:, :)
+      ! CEH matrix element derivative arrays: 
+      real(wp), allocatable :: dh0dr(:,:,:), dh0dL(:,:,:,:), doverlap(:,:,:), doverlap_diat(:,:,:)
 
       call timer%push("total CEH")
 
@@ -115,11 +122,6 @@ contains
       if (prlevel > 1) then
          call ctx%message("CEH singlepoint")
       endif
-      ! Gradient logical as future starting point (not implemented yet)
-      ! Entry point could either be (i) modified wavefunction type (including derivatives),
-      ! (iii) additional wavefunction derivative type (see old commits) or (ii) optional
-      ! dqdR variable in this routine
-      grad = .false.
 
       ! Define occupation
       call get_occupation(mol, calc%bas, calc%h0, wfn%nocc, wfn%n0at, wfn%n0sh)
@@ -149,9 +151,13 @@ contains
       end if
 
       ! calculate the scaled self energies
-      allocate(selfenergy(calc%bas%nsh), dsedcn(calc%bas%nsh), dsedcn_en(calc%bas%nsh))
-      call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, cn=cn, cn_en=cn_en, &
-      & selfenergy=selfenergy, dsedcn=dsedcn, dsedcn_en=dsedcn_en)
+      allocate(selfenergy(calc%bas%nsh)) 
+      if (grad) then
+         allocate(dsedr(3, mol%nat,calc%bas%nsh), dsedL(3, 3, calc%bas%nsh))
+      end if 
+      call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, &
+      & cn=cn, cn_en=cn_en, dcndr=dcndr, dcndL=dcndL, dcn_endr=dcn_endr, dcn_endL=dcn_endL, &
+      & selfenergy=selfenergy, dsedr=dsedr, dsedL=dsedL)
 
       cutoff = get_cutoff(calc%bas, accuracy)
       call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
@@ -170,7 +176,7 @@ contains
       call timer%pop
 
       ! Get initial potential for external fields and Coulomb
-      call new_potential(pot, mol, calc%bas, wfn%nspin)
+      call new_potential(pot, mol, calc%bas, wfn%nspin, grad)
       ! Set potential to zero
       call pot%reset
       ! Add potential due to external field
@@ -184,10 +190,14 @@ contains
       if (allocated(calc%coulomb)) then
          call timer%push("coulomb")
          ! Use electronegativity-weighted CN as 0th-order charge guess
-         call get_effective_qat(mol, calc%bas, cn_en, wfn%qat)
-      
+         call get_effective_qat(mol, cn_en, wfn%qat, &
+         & dcn_endr, dcn_endL, wfn%dqatdr, wfn%dqatdL)
+
          call calc%coulomb%update(mol, ccache)
          call calc%coulomb%get_potential(mol, ccache, wfn, pot)
+         if(grad) then
+            call calc%coulomb%get_potential_gradient(mol, ccache, wfn, pot)
+         end if
          call timer%pop
       end if
 
@@ -214,9 +224,34 @@ contains
       allocate(tmp(3), source = 0.0_wp)
       call gemv(mol%xyz, wfn%qat(:, 1), tmp)
       dipole(:) = tmp + sum(wfn%dpat(:, :, 1), 2)
-
-      call timer%pop
       
+      if (grad) then
+         call timer%push("CEH gradient")
+         allocate(dh0dr(3,calc%bas%nao,calc%bas%nao), dh0dL(3,3,calc%bas%nao,calc%bas%nao), &
+         & doverlap(3,calc%bas%nao,calc%bas%nao), doverlap_diat(3,calc%bas%nao,calc%bas%nao), &
+         & source = 0.0_wp)
+
+         ! Get the derivative of the Fock matrix elements
+         call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+            & dsedr, dsedL, pot, doverlap, doverlap_diat, dh0dr, dh0dL)
+
+         ! Use the matrix element derivatives (F + S) to get the density matrix graidient
+         ! based on the coupled-perturbed formalism
+         call get_density_matrix_gradient(mol, calc%bas, wfn, list, dh0dr, dh0dL, doverlap, &
+         & wfn%ddensitydr(:, :, :, 1), wfn%ddensitydL(:, :, :, :, 1))
+
+         ! Derivative of the CEH Mulliken charges
+         call get_mulliken_atomic_charges_gradient(calc%bas, mol, ints%overlap, wfn%density, &
+         & doverlap, wfn%ddensitydr, wfn%ddensitydL, wfn%dqatdr, wfn%dqatdL)
+
+         call timer%pop
+      end if 
+      
+      ! delete solver for numerical derivative 
+      call ctx%delete_solver(solver)
+      
+      call timer%pop
+
       block
          integer :: it
          real(wp) :: ttime, stime

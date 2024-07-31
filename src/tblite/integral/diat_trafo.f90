@@ -509,7 +509,6 @@ contains
       trafomat_dpy(4,2) = -COSPY
       trafomat_dpy(2,2) = -SINPY
       trafomat_dpy(3,2) = 0.0_wp
-           
 
       if ( maxl <= 1 ) then 
          dtrafomat(1, 1:4, 1:4) = dpdx * trafomat_dp(1:4, 1:4) + dtdx * trafomat_dt(1:4, 1:4) 
