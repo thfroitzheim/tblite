@@ -391,13 +391,13 @@ contains
       call new_erf_en_ncoord(ncoord_en, mol, cutoff=cn_cutoff, rcov=rcov)
       cutoff = get_cutoff(bas)
 
+      call new_hamiltonian(h0, mol, bas, ceh_h0spec(mol))
+      call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
+
       allocate(selfenergy(bas%nsh), selfenergyr(bas%nsh), selfenergyl(bas%nsh))
       do iat = 1, mol%nat
          do ic = 1, 3
             mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
-            call new_hamiltonian(h0, mol, bas, ceh_h0spec(mol))
-      
-            call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
             call get_coordination_number(ncoord , mol, lattr, cn_cutoff, cn)
             call get_coordination_number(ncoord_en, mol, lattr, cn_cutoff, cn_en)
 
@@ -405,8 +405,6 @@ contains
             & selfenergy=selfenergyr)
             
             mol%xyz(ic, iat) = mol%xyz(ic, iat) - 2*step
-            call new_hamiltonian(h0, mol, bas, ceh_h0spec(mol))
-      
             call get_coordination_number(ncoord , mol, lattr, cn_cutoff, cn)
             call get_coordination_number(ncoord_en, mol, lattr, cn_cutoff, cn_en)
             
@@ -417,10 +415,7 @@ contains
             numdr(ic, iat, :) = 0.5_wp*(selfenergyr - selfenergyl)/step
          end do
       end do
-
-      call new_hamiltonian(h0, mol, bas, ceh_h0spec(mol))
       
-      call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
       call get_coordination_number(ncoord, mol, lattr, cutoff, cn, dcndr, dcndL)
       call get_coordination_number(ncoord_en, mol, lattr, cutoff, cn_en, dcn_endr, dcn_endL)
 
@@ -518,9 +513,9 @@ contains
       real(wp), parameter :: step = 1.0e-6_wp
       real(wp), allocatable :: lattr(:, :), cn(:), cn_en(:)
       real(wp), allocatable :: dcndr(:, :, :), dcndL(:, :, :), dcn_endr(:, :, :), dcn_endL(:, :, :)
-      real(wp), allocatable :: h1l(:, :, :), h1r(:, :, :)
+      real(wp), allocatable :: h1l(:, :, :), h1r(:, :, :), numdr(:, :, :)
       real(wp), allocatable :: selfenergy(:), dsedr(:,:,:), dsedL(:,:,:)
-      real(wp), allocatable :: numdr(:, :, :), dh0dr(:, :, :), dh0dL(:, :, :, :), doverlap(:, :, :), doverlap_diat(:, :, :)  
+      real(wp), allocatable :: dh0dr(:, :, :), dh0dL(:, :, :, :), doverlap(:, :, :), doverlap_diat(:, :, :)  
       real(wp) :: cutoff
       integer :: iat, ic, ii, jj, is, ish, izp, iao, jat, js, jsh, jzp, jao
 
@@ -824,7 +819,7 @@ contains
       real(wp), allocatable :: dcndr(:, :, :), dcndL(:, :, :), dcn_endr(:, :, :), dcn_endL(:, :, :)
       real(wp), allocatable :: hamiltonian(:, :, :), dh0dr(:, :, :), dh0dL(:, :, :, :)
       real(wp), allocatable :: selfenergy(:), dsedr(:,:,:), dsedL(:,:,:)
-      real(wp), allocatable :: numdr(:, :, :, :),numdr2(:, :, :, :), numqdr(:, :, :), doverlap(:, :, :), doverlap_diat(:, :, :) 
+      real(wp), allocatable :: numdr(:, :, :, :), numdr2(:, :, :, :), numqdr(:, :, :), doverlap(:, :, :), doverlap_diat(:, :, :) 
       real(wp) :: cutoff
       integer :: iat, ic, ii, jj, is, ish, izp, iao, jat, js, jsh, jzp, jao
 
@@ -1092,14 +1087,15 @@ contains
       allocate(ql(mol%nat), qr(mol%nat), dqdr(3, mol%nat, mol%nat), dqdL(3, 3, mol%nat), &
       & numdr(3, mol%nat, mol%nat))
 
+      call new_ceh_calculator(calc, mol, error)
+      if (allocated(error)) return
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
+      ctx%verbosity = 0
+
       lp: do iat = 1, mol%nat
          do ic = 1, 3
             mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
-
-            call new_ceh_calculator(calc, mol, error)
-            if (allocated(error)) return
-            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
-            ctx%verbosity = 0
+            
             call ceh_singlepoint(ctx, calc, mol, wfn, accuracy, .false.)
             if (ctx%failed()) then
                call ctx%get_error(error)
@@ -1107,14 +1103,8 @@ contains
             end if
             qr = wfn%qat(:,1)
             
-            if (allocated(error)) exit lp
-            
             mol%xyz(ic, iat) = mol%xyz(ic, iat) - 2*step
 
-            call new_ceh_calculator(calc, mol, error)
-            if (allocated(error)) return
-            call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
-            ctx%verbosity = 0
             call ceh_singlepoint(ctx, calc, mol, wfn, accuracy, .false.)
             if (ctx%failed()) then
                call ctx%get_error(error)
@@ -1122,8 +1112,6 @@ contains
             end if
             ql = wfn%qat(:,1)
             
-            if (allocated(error)) exit lp
-
             mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
             numdr(ic, iat, :) = 0.5_wp*(qr - ql)/step
 
@@ -1131,8 +1119,6 @@ contains
       end do lp
 
       ! Analytical gradient
-      call new_ceh_calculator(calc, mol, error)
-      if (allocated(error)) return
       call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .true.)
       ctx%verbosity = 0
       call ceh_singlepoint(ctx, calc, mol, wfn, accuracy, .true.)
