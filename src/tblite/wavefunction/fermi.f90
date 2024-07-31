@@ -23,7 +23,7 @@ module tblite_wavefunction_fermi
    implicit none
    private
 
-   public :: get_fermi_filling
+   public :: get_fermi_filling, get_fermi_filling_gradient
 
 
 contains
@@ -42,12 +42,37 @@ subroutine get_fermi_filling(nel, kt, emo, homo, focc, e_fermi)
 
    call get_aufbau_filling(nel, homo, focc)
 
-   if (homo > 0) then
+   ! Optimize the Fermilevel if there is a finite temperature
+   if (homo > 0 .and. kt .gt. 0) then
       call get_fermi_filling_(homo, kt, emo, focc, etmp)
       e_fermi = 0.5_wp * etmp
    end if
 
 end subroutine get_fermi_filling
+
+subroutine get_fermi_filling_gradient(nel, kt, emo, demo, homo, focc, dfocc, e_fermi)
+   real(wp), intent(in) :: nel
+   real(wp), intent(in) :: emo(:)
+   real(wp), intent(in) :: demo(:)
+   real(wp), intent(in) :: kt
+   integer, intent(out) :: homo
+   real(wp), intent(out) :: focc(:)
+   real(wp), intent(out) :: dfocc(:)
+   real(wp), intent(out) :: e_fermi
+
+   real(wp) :: etmp, stmp
+
+   e_fermi = 0.0_wp
+
+   call get_aufbau_filling(nel, homo, focc)
+
+   if (homo > 0) then
+      call get_fermi_filling_(homo, kt, emo, focc, etmp)
+      call get_fermi_filling_gradient_(homo, kt, etmp, emo, demo, dfocc)
+      e_fermi = 0.5_wp * etmp
+   end if
+
+end subroutine get_fermi_filling_gradient
 
 subroutine get_aufbau_filling(nel, homo, occ)
    real(wp), intent(in) :: nel
@@ -99,5 +124,30 @@ subroutine get_fermi_filling_(homo, kt, emo, occ, e_fermi)
    end do
 
 end subroutine get_fermi_filling_
+
+subroutine get_fermi_filling_gradient_(homo, kt, e_fermi, emo, demo, docc)
+
+   integer, intent(in) :: homo
+   real(wp), intent(in) :: kt
+   real(wp), intent(in) :: e_fermi
+   real(wp), intent(in) :: emo(:)
+   real(wp), intent(in) :: demo(:)
+   real(wp), intent(out) :: docc(:)
+
+   real(wp) :: dfermifunct
+   integer :: iao
+
+   ! Calculate the derivati
+   do iao = 1, size(emo)
+      if((emo(iao)-e_fermi)/kt.lt.50) then
+         dfermifunct = exp((emo(iao)-e_fermi)/kt) / &
+            & (kt*(exp((emo(iao)-e_fermi)/kt)+1.0)**2)
+      else
+         dfermifunct = 0.0
+      end if
+      docc(iao) = dfermifunct * demo(iao)
+   end do
+
+end subroutine get_fermi_filling_gradient_
 
 end module tblite_wavefunction_fermi

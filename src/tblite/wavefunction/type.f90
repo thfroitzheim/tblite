@@ -65,6 +65,11 @@ module tblite_wavefunction_type
       !> Atomic quadrupole moments for each atom, shape: [5, nat, spin]
       real(wp), allocatable :: qpat(:, :, :)
 
+      !> Derivative of the density matrix w.r.t. the positions: [3, nao, nao, spin]
+      real(wp), allocatable :: ddensitydr(:, :, :, :)
+      !> Derivative of the density matrix  w.r.t. the lattice vectors: [3, 3, nao, nao, spin]
+      real(wp), allocatable :: ddensitydL(:, :, :, :, :)
+
       !> Derivative of atomic charges w.r.t. the positions: [3, nat, nat, spin]
       real(wp), allocatable :: dqatdr(:, :, :, :)
       !> Derivative of atomic charges w.r.t. the lattice vectors: [3, 3, nat, spin]
@@ -74,6 +79,7 @@ module tblite_wavefunction_type
       real(wp), allocatable :: dqshdr(:, :, :, :)
       !> Derivative of shell charges w.r.t. the lattice vectors: [3, 3, nsh, spin]
       real(wp), allocatable :: dqshdL(:, :, :, :)
+
    end type wavefunction_type
 
 contains
@@ -112,16 +118,21 @@ subroutine new_wavefunction(self, nat, nsh, nao, nspin, kt, grad)
    ! Check if a wavefunction gradient is requested
    if(present(grad)) then
       if(grad) then
+         allocate(self%ddensitydr(3, nao, nao, nspin))
+         allocate(self%ddensitydL(3, 3, nao, nao, nspin))
+
          allocate(self%dqatdr(3, nat, nat, nspin))
          allocate(self%dqatdL(3, 3, nat, nspin))
 
          allocate(self%dqshdr(3, nat, nsh, nspin))
          allocate(self%dqshdL(3, 3, nsh, nspin))
 
-         self%dqatdr(:, :, :, :) = 0.0_wp
-         self%dqatdL(:, :, :, :) = 0.0_wp
          self%dqshdr(:, :, :, :) = 0.0_wp
          self%dqshdL(:, :, :, :) = 0.0_wp
+         self%dqatdr(:, :, :, :) = 0.0_wp
+         self%dqatdL(:, :, :, :) = 0.0_wp
+         self%ddensitydr(:, :, :, :) = 0.0_wp
+         self%ddensitydL(:, :, :, :, :) = 0.0_wp
       end if
    end if
 

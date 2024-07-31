@@ -59,6 +59,7 @@ contains
       character(len=:), allocatable :: method, filename
       integer :: unpaired, charge, unit
       real(wp) :: dpmom(3)
+      real(wp), allocatable :: gradient(:, :), sigma(:, :)
       type(context_type) :: ctx
       type(xtb_calculator):: calc_ceh
       type(wavefunction_type) :: wfn_ceh
@@ -79,10 +80,10 @@ contains
       end if
       if (allocated(error)) return
 
-      if (config%grad) then
-         call fatal_error(error, "Charge gradient not yet implemented.")
-      end if
-      if (allocated(error)) return
+      ! if (config%grad) then
+      !    call fatal_error(error, "Charge gradient not yet implemented.")
+      ! end if
+      ! if (allocated(error)) return
 
       if (allocated(config%charge)) then
          mol%charge = config%charge
@@ -152,7 +153,7 @@ contains
       case("eeq")
          call eeq_guess(mol, qat, dpat)
       case("ceh")
-         call ceh_singlepoint(ctx, calc_ceh, mol, wfn_ceh, config%accuracy, config%verbosity)
+         call ceh_singlepoint(ctx, calc_ceh, mol, wfn_ceh, config%accuracy, config%grad, config%verbosity)
          if (ctx%failed()) then
             call fatal(ctx, "CEH singlepoint calculation failed")
             do while(ctx%failed())
