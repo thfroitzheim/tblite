@@ -19,6 +19,7 @@ set(dir "${CMAKE_CURRENT_SOURCE_DIR}")
 list(
   APPEND srcs
   "${dir}/ceh.f90"
+  "${dir}/coupled_perturbed.f90"
   "${dir}/h0.f90"
   "${dir}/singlepoint.f90"
 )
