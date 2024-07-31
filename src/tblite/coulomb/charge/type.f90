@@ -198,7 +198,7 @@ subroutine get_potential_gradient(self, mol, cache, wfn, pot)
    !> Density dependent potential
    type(potential_type), intent(inout) :: pot
 
-   integer :: ic, id, iat, ndim
+   integer :: ic, iat, ndim
    real(wp), allocatable :: dadr(:, :, :), dadL(:, :, :), datr(:, :)
    type(coulomb_cache), pointer :: ptr
 
