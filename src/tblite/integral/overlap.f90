@@ -19,23 +19,33 @@
 
 !> Implementation of overlap integrals
 module tblite_integral_overlap
+   
+   use iso_fortran_env, only: output_unit
+
+
    use mctc_env, only : wp
    use mctc_io, only : structure_type
    use mctc_io_constants, only : pi
+   use tblite_adjlist, only : adjacency_list
    use tblite_basis_type, only : basis_type, cgto_type
    use tblite_integral_diat_trafo, only: diat_trafo, diat_trafo_grad
    use tblite_integral_trafo, only : transform0, transform1, transform2
    implicit none
    private
 
-   public :: overlap_cgto, overlap_cgto_diat, overlap_grad_cgto, overlap_grad_cgto_diat
-   public :: get_overlap
+   public :: overlap_cgto, overlap_cgto_diat, overlap_grad_cgto, overlap_grad_cgto_diat, overlap_grad_decontracted_cgto
+   public :: get_overlap, get_overlap_gradient
    public :: maxl, msao, smap
 
    interface get_overlap
       module procedure :: get_overlap_lat
       module procedure :: get_overlap_diat_lat
    end interface get_overlap
+
+   interface get_overlap_gradient
+      module procedure :: get_overlap_lat_gradient
+      module procedure :: get_overlap_diat_lat_gradient
+   end interface get_overlap_gradient
 
    integer, parameter :: maxl = 6
    integer, parameter :: maxl2 = maxl*2
@@ -75,6 +85,50 @@ module tblite_integral_overlap
 
 contains
 
+
+subroutine write_2d_matrix(matrix, name, unit, step)
+   implicit none
+   real(wp), intent(in) :: matrix(:, :)
+   character(len=*), intent(in), optional :: name
+   integer, intent(in), optional :: unit
+   integer, intent(in), optional :: step
+   integer :: d1, d2
+   integer :: i, j, k, l, istep, iunit
+
+   d1 = size(matrix, dim=1)
+   d2 = size(matrix, dim=2)
+
+   if (present(unit)) then
+     iunit = unit
+   else
+     iunit = output_unit
+   end if
+
+   if (present(step)) then
+     istep = step
+   else
+     istep = 6
+   end if
+
+   if (present(name)) write (iunit, '(/,"matrix printed:",1x,a)') name
+
+   do i = 1, d2, istep
+     l = min(i + istep - 1, d2)
+     write (iunit, '(/,6x)', advance='no')
+     do k = i, l
+       write (iunit, '(6x,i7,3x)', advance='no') k
+     end do
+     write (iunit, '(a)')
+     do j = 1, d1
+       write (iunit, '(i6)', advance='no') j
+       do k = i, l
+         write (iunit, '(1x,f15.12)', advance='no') matrix(j, k)
+       end do
+       write (iunit, '(a)')
+     end do
+   end do
+
+end subroutine write_2d_matrix
 
 elemental function overlap_1d(moment, alpha) result(overlap)
    integer, intent(in) :: moment
@@ -293,9 +347,9 @@ end subroutine overlap_grad_3d
 
 pure subroutine overlap_cgto(cgtoj, cgtoi, r2, vec, intcut, overlap)
    !> Description of contracted Gaussian function on center i
-   type(cgto_type), intent(in) :: cgtoi
+   class(cgto_type), intent(in) :: cgtoi
    !> Description of contracted Gaussian function on center j
-   type(cgto_type), intent(in) :: cgtoj
+   class(cgto_type), intent(in) :: cgtoj
    !> Square distance between center i and j
    real(wp), intent(in) :: r2
    !> Distance vector between center i and j, ri - rj
@@ -342,9 +396,9 @@ end subroutine overlap_cgto
 pure subroutine overlap_cgto_diat(cgtoj, cgtoi, r2, vec, intcut, & 
 & ksig, kpi, kdel, overlap, overlap_diat)
    !> Description of contracted Gaussian function on center i
-   type(cgto_type), intent(in) :: cgtoi
+   class(cgto_type), intent(in) :: cgtoi
    !> Description of contracted Gaussian function on center j
-   type(cgto_type), intent(in) :: cgtoj
+   class(cgto_type), intent(in) :: cgtoj
    !> Square distance between center i and j
    real(wp), intent(in) :: r2
    !> Distance vector between center i and j, ri - rj
@@ -408,12 +462,12 @@ pure subroutine overlap_cgto_diat(cgtoj, cgtoi, r2, vec, intcut, &
 
 end subroutine overlap_cgto_diat
 
-
-pure subroutine overlap_grad_cgto(cgtoj, cgtoi, r2, vec, intcut, overlap, doverlap)
+! pure
+subroutine overlap_grad_cgto(cgtoj, cgtoi, r2, vec, intcut, overlap, doverlap)
    !> Description of contracted Gaussian function on center j
-   type(cgto_type), intent(in) :: cgtoj
+   class(cgto_type), intent(in) :: cgtoj
    !> Description of contracted Gaussian function on center i
-   type(cgto_type), intent(in) :: cgtoi
+   class(cgto_type), intent(in) :: cgtoi
    !> Square distance between center i and j
    real(wp), intent(in) :: r2
    !> Distance vector between center i and j, ri - rj
@@ -463,13 +517,72 @@ pure subroutine overlap_grad_cgto(cgtoj, cgtoi, r2, vec, intcut, overlap, doverl
 
 end subroutine overlap_grad_cgto
 
+! pure
+subroutine overlap_grad_decontracted_cgto(nat, cgtoj, cgtoi, r2, vec, intcut, overlap, doverlap)
+   !> Number of atoms in the molecule
+   integer, intent(in) :: nat
+   !> Description of contracted Gaussian function on center j
+   class(cgto_type), intent(in) :: cgtoj
+   !> Description of contracted Gaussian function on center i
+   class(cgto_type), intent(in) :: cgtoi
+   !> Square distance between center i and j
+   real(wp), intent(in) :: r2
+   !> Distance vector between center i and j, ri - rj
+   real(wp), intent(in) :: vec(3)
+   !> Maximum value of integral prefactor to consider
+   real(wp), intent(in) :: intcut
+   !> Overlap integrals for the given pair i  and j
+   real(wp), intent(out) :: overlap(msao(cgtoj%ang), msao(cgtoi%ang))
+   !> Overlap integral gradient for the given pair i  and j
+   real(wp), intent(out) :: doverlap(3, nat, msao(cgtoj%ang), msao(cgtoi%ang))
+
+   integer :: ip, jp, mli, mlj, l
+   real(wp) :: eab, oab, est, s1d(0:maxl2), rpi(3), rpj(3), cc, val, grad(3), pre, dcc(3,nat)
+   real(wp) :: s3d(mlao(cgtoj%ang), mlao(cgtoi%ang))
+   real(wp) :: ds3d(3, nat, mlao(cgtoj%ang), mlao(cgtoi%ang))
+
+   s3d(:, :) = 0.0_wp
+   ds3d(:, :, :, :) = 0.0_wp
+
+   do ip = 1, cgtoi%nprim
+      do jp = 1, cgtoj%nprim
+         eab = cgtoi%alpha(ip) + cgtoj%alpha(jp)
+         oab = 1.0_wp/eab
+         est = cgtoi%alpha(ip) * cgtoj%alpha(jp) * r2 * oab
+         if (est > intcut) cycle
+         pre = exp(-est) * sqrtpi3*sqrt(oab)**3
+         rpi = -vec * cgtoj%alpha(jp) * oab
+         rpj = +vec * cgtoi%alpha(ip) * oab
+         do l = 0, cgtoi%ang + cgtoj%ang + 1
+            s1d(l) = overlap_1d(l, eab)
+         end do
+         cc = cgtoi%coeff(ip) * cgtoj%coeff(jp) * pre
+         dcc = (cgtoi%dcoeffdr(:,:,ip) * cgtoj%coeff(jp) &
+         & + cgtoi%coeff(ip) * cgtoj%dcoeffdr(:,:,jp)) * pre
+         do mli = 1, mlao(cgtoi%ang)
+            do mlj = 1, mlao(cgtoj%ang)
+               call overlap_3d(rpj, rpi, cgtoj%alpha(jp), cgtoi%alpha(ip), &
+                  & lx(:, mlj+lmap(cgtoj%ang)), lx(:, mli+lmap(cgtoi%ang)), &
+                  & s1d, val)
+               s3d(mlj, mli) = s3d(mlj, mli) + cc*val
+               ds3d(:, :, mlj, mli) = ds3d(:, :, mlj, mli) + dcc*val 
+            end do
+         end do
+      end do
+   end do
+
+   call transform0(cgtoj%ang, cgtoi%ang, s3d, overlap)
+   call transform2(cgtoj%ang, cgtoi%ang, ds3d, doverlap)
+
+end subroutine overlap_grad_decontracted_cgto
+
 
 pure subroutine overlap_grad_cgto_diat(cgtoj, cgtoi, r2, vec, intcut, &
 &  ksig, kpi, kdel, overlap, doverlap, overlap_diat, doverlap_diat)
    !> Description of contracted Gaussian function on center j
-   type(cgto_type), intent(in) :: cgtoj
+   class(cgto_type), intent(in) :: cgtoj
    !> Description of contracted Gaussian function on center i
-   type(cgto_type), intent(in) :: cgtoi
+   class(cgto_type), intent(in) :: cgtoi
    !> Square distance between center i and j
    real(wp), intent(in) :: r2
    !> Distance vector between center i and j, ri - rj
@@ -549,161 +662,359 @@ pure subroutine overlap_grad_cgto_diat(cgtoj, cgtoi, r2, vec, intcut, &
 end subroutine overlap_grad_cgto_diat
 
 
-!> Evaluate overlap for a molecular structure
-subroutine get_overlap_lat(mol, trans, cutoff, bas, overlap)
+!> Evaluate overlap of a orthonormalized basis set for a molecular structure
+subroutine get_overlap_lat(mol, trans, list, bas, overlap)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Lattice points within a given realspace cutoff
    real(wp), intent(in) :: trans(:, :)
-   !> Realspace cutoff
-   real(wp), intent(in) :: cutoff
-   !> Basis set information
-   type(basis_type), intent(in) :: bas
+   !> Neighbour list
+   type(adjacency_list), intent(in) :: list
+   !> Basis set information (orthonormalized)
+   class(basis_type), intent(in) :: bas
    !> Overlap matrix
    real(wp), intent(out) :: overlap(:, :)
 
-   integer :: iat, jat, izp, jzp, itr, is, js
+   integer :: iat, jat, izp, jzp, itr, img, inl, is, js
    integer :: ish, jsh, ii, jj, iao, jao, nao
-   real(wp) :: r2, vec(3), cutoff2
+   real(wp) :: r2, vec(3)
    real(wp), allocatable :: stmp(:)
 
    overlap(:, :) = 0.0_wp
 
    allocate(stmp(msao(bas%maxl)**2))
-   cutoff2 = cutoff**2
 
    !$omp parallel do schedule(runtime) default(none) &
-   !$omp shared(mol, bas, trans, cutoff2, overlap) private(r2, vec, stmp) &
-   !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao)
+   !$omp shared(mol, bas, trans, overlap, list) private(r2, vec, stmp) &
+   !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, inl, img)
    do iat = 1, mol%nat
       izp = mol%id(iat)
       is = bas%ish_at(iat)
-      do jat = 1, mol%nat
+      inl = list%inl(iat)
+      do img = 1, list%nnl(iat)
+         jat = list%nlat(img+inl)
+         itr = list%nltr(img+inl)
          jzp = mol%id(jat)
          js = bas%ish_at(jat)
-         do itr = 1, size(trans, 2)
-            vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
-            r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
-            if (r2 > cutoff2) cycle
-            do ish = 1, bas%nsh_id(izp)
-               ii = bas%iao_sh(is+ish)
-               do jsh = 1, bas%nsh_id(jzp)
-                  jj = bas%iao_sh(js+jsh)
-                  call overlap_cgto(bas%cgto(jsh, jzp), bas%cgto(ish, izp), &
-                     & r2, vec, bas%intcut, stmp)
+         if (iat == jat) cycle
+         vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
+         r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
+         do ish = 1, bas%nsh_id(izp)
+            ii = bas%iao_sh(is+ish)
+            do jsh = 1, bas%nsh_id(jzp)
+               jj = bas%iao_sh(js+jsh)
+               call overlap_cgto(bas%cgto(jsh, jzp), bas%cgto(ish, izp), &
+                  & r2, vec, bas%intcut, stmp)
 
-                  nao = msao(bas%cgto(jsh, jzp)%ang)
-                  !$omp simd collapse(2)
-                  do iao = 1, msao(bas%cgto(ish, izp)%ang)
-                     do jao = 1, nao
-                        overlap(jj+jao, ii+iao) = overlap(jj+jao, ii+iao) &
-                           & + stmp(jao + nao*(iao-1))
-                     end do
+               nao = msao(bas%cgto(jsh, jzp)%ang)
+               !$omp simd collapse(2)
+               do iao = 1, msao(bas%cgto(ish, izp)%ang)
+                  do jao = 1, nao
+
+                     overlap(jj+jao, ii+iao) = overlap(jj+jao, ii+iao) &
+                        & + stmp(jao + nao*(iao-1))
+                     
+                     overlap(ii+iao, jj+jao) = overlap(ii+iao, jj+jao) &
+                        & + stmp(jao + nao*(iao-1))
                   end do
-
                end do
             end do
-
          end do
       end do
    end do
 
+   ! Diagonal assuming orthonormality
+   do iao = 1, bas%nao
+      overlap(iao, iao) = 1.0_wp 
+   end do 
+
 end subroutine get_overlap_lat
 
-!> Evaluate overlap and diatomic frame scaling
-subroutine get_overlap_diat_lat(mol, trans, cutoff, bas, scal_fac, overlap, overlap_diat)
+!> Evaluate diatomic frame-scaled overlap of a orthonormalized basis set for a molecular structure
+subroutine get_overlap_diat_lat(mol, trans, list, bas, ksig, kpi, kdel, overlap, overlap_diat)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Lattice points within a given realspace cutoff
    real(wp), intent(in) :: trans(:, :)
-   !> Realspace cutoff
-   real(wp), intent(in) :: cutoff
+   !> Neighbour list
+   type(adjacency_list), intent(in) :: list
    !> Basis set information
-   type(basis_type), intent(in) :: bas
-   !> Scaling factors for the diatomic frame
-   real(wp), intent(in) :: scal_fac(:,:)
+   class(basis_type), intent(in) :: bas
+   !> Scaling factors for the diatomic frame for each combination of atomic species
+   real(wp), allocatable, intent(in) :: ksig(:,:), kpi(:,:), kdel(:,:)
    !> Overlap matrix
    real(wp), intent(out) :: overlap(:, :)
    !> Overlap matrix with diatomic frame-scaled elements in the diatomic frame
    real(wp), intent(out) :: overlap_diat(:, :)
-   !> Scaling factors for the diatomic frame for the three differnt bonding motifs
-   !> (sigma, pi, delta)
-   real(wp) :: ksig, kpi, kdel
 
-   integer :: iat, jat, izp, jzp, itr, is, js
+   integer :: iat, jat, izp, jzp, itr, is, js, img, inl
    integer :: ish, jsh, ii, jj, iao, jao, nao
-   real(wp) :: r2, vec(3), cutoff2
+   real(wp) :: r2, vec(3)
    real(wp), allocatable :: stmp(:), stmp_diat(:)
-
-   if (size(scal_fac,1) /= 3) then
-      error stop 'Error: scal_fac must have the dimension of 3, &
-      & since it covers the three different types of bonding'
-   end if
 
    overlap(:, :) = 0.0_wp
    overlap_diat(:, :) = 0.0_wp
 
    allocate(stmp(msao(bas%maxl)**2), stmp_diat(msao(bas%maxl)**2))
-   cutoff2 = cutoff**2
 
    !$omp parallel do schedule(runtime) default(none) &
-   !$omp shared(mol, bas, trans, cutoff2, overlap, overlap_diat, scal_fac) &
+   !$omp shared(mol, bas, trans, overlap, overlap_diat, ksig, kpi, kdel, list) &
    !$omp private(r2, vec, stmp, stmp_diat) &
-   !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao) &
-   !$omp private(ksig, kpi, kdel)
+   !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, inl, img) 
    do iat = 1, mol%nat
       izp = mol%id(iat)
       is = bas%ish_at(iat)
-      do jat = 1, mol%nat
+      inl = list%inl(iat)
+      do img = 1, list%nnl(iat)
+         jat = list%nlat(img+inl)
+         itr = list%nltr(img+inl)
          jzp = mol%id(jat)
          js = bas%ish_at(jat)
-         do itr = 1, size(trans, 2)
-            vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
-            r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
-            if (r2 > cutoff2) cycle
-            if (iat /= jat) then
-               !> Determine scaling factors from atom parameters
-               ksig = 2.0_wp / (1.0_wp / scal_fac(1,mol%num(mol%id(iat))) &
-               & + 1.0_wp / scal_fac(1,mol%num(mol%id(jat))) )
-               kpi = 2.0_wp / (1.0_wp / scal_fac(2,mol%num(mol%id(iat))) &
-               & + 1.0_wp / scal_fac(2,mol%num(mol%id(jat))) )
-               kdel = 2.0_wp / (1.0_wp / scal_fac(3,mol%num(mol%id(iat))) &
-               & + 1.0_wp / scal_fac(3,mol%num(mol%id(jat))) )
-            end if
-            do ish = 1, bas%nsh_id(izp)
-               ii = bas%iao_sh(is+ish)
-               do jsh = 1, bas%nsh_id(jzp)
-                  jj = bas%iao_sh(js+jsh)
-                  stmp = 0.0_wp
-                  stmp_diat = 0.0_wp
-                  if (iat /= jat) then
-                     call overlap_cgto_diat(bas%cgto(jsh, jzp), bas%cgto(ish, izp), &
-                        & r2, vec, bas%intcut, ksig, kpi, kdel, stmp, stmp_diat)
-                  else
-                     call overlap_cgto(bas%cgto(jsh, jzp), bas%cgto(ish, izp), &
-                        & r2, vec, bas%intcut, stmp)
-                     stmp_diat = stmp
-                  endif
+         vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
+         r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
 
-                  nao = msao(bas%cgto(jsh, jzp)%ang)
-                  !$omp simd collapse(2)
-                  do iao = 1, msao(bas%cgto(ish, izp)%ang)
-                     do jao = 1, msao(bas%cgto(jsh, jzp)%ang)
-                        overlap(jj+jao, ii+iao) = overlap(jj+jao, ii+iao) &
-                           & + stmp(jao + nao*(iao-1))
-                        
-                        overlap_diat(jj+jao, ii+iao) = overlap_diat(jj+jao, ii+iao) &
-                           & + stmp_diat(jao + nao*(iao-1))
-                     end do
+         do ish = 1, bas%nsh_id(izp)
+            ii = bas%iao_sh(is+ish)
+            do jsh = 1, bas%nsh_id(jzp)
+               jj = bas%iao_sh(js+jsh)
+               stmp = 0.0_wp
+               stmp_diat = 0.0_wp
+
+               call overlap_cgto_diat(bas%cgto(jsh, jzp), bas%cgto(ish, izp), r2, vec, &
+                  & bas%intcut, ksig(izp,jzp), kpi(izp,jzp), kdel(izp,jzp), stmp, stmp_diat)
+
+               nao = msao(bas%cgto(jsh, jzp)%ang)
+               !$omp simd collapse(2)
+               do iao = 1, msao(bas%cgto(ish, izp)%ang)
+                  do jao = 1, msao(bas%cgto(jsh, jzp)%ang)
+                     overlap(jj+jao, ii+iao) = overlap(jj+jao, ii+iao) &
+                        & + stmp(jao + nao*(iao-1))
+                     overlap(ii+iao, jj+jao) = overlap(ii+iao, jj+jao) &
+                        & + stmp(jao + nao*(iao-1))
+
+                     overlap_diat(jj+jao, ii+iao) = overlap_diat(jj+jao, ii+iao) &
+                        & + stmp_diat(jao + nao*(iao-1))
+                     overlap_diat(ii+iao, jj+jao) = overlap_diat(ii+iao, jj+jao) &
+                        & + stmp_diat(jao + nao*(iao-1))
                   end do
-
                end do
             end do
-
          end do
       end do
    end do
 
+   ! Diagonal assuming orthonormality
+   do iao = 1, bas%nao
+      overlap(iao, iao) = 1.0_wp 
+      overlap_diat(iao, iao) = 1.0_wp 
+   end do 
+
 end subroutine get_overlap_diat_lat
+
+!> Evaluate overlap and gradients of a orthonormalized basis set for a molecular structure
+subroutine get_overlap_lat_gradient(mol, trans, list, bas, overlap, doverlap)
+   !> Molecular structure data
+   type(structure_type), intent(in) :: mol
+   !> Lattice points within a given realspace cutoff
+   real(wp), intent(in) :: trans(:, :)
+   !> Neighbour list
+   type(adjacency_list), intent(in) :: list
+   !> Basis set information
+   class(basis_type), intent(in) :: bas
+   !> Overlap matrix
+   real(wp), intent(inout) :: overlap(:, :)
+   !> Derivative of the overlap matrix w.r.t. coordinate displacements
+   real(wp), intent(inout) :: doverlap(:, :, :)
+
+   integer :: iat, jat, izp, jzp, itr, img, inl
+   integer :: ish, jsh, is, js, ii, jj, iao, jao, nao, ij, iaosh, jaosh
+   real(wp) :: r2, vec(3) 
+   real(wp), allocatable :: stmp(:), dstmp(:, :)
+
+   overlap(:, :) = 0.0_wp
+   doverlap(:, :, :) = 0.0_wp
+
+   allocate(stmp(msao(bas%maxl)**2), dstmp(3, msao(bas%maxl)**2))
+
+   !$omp parallel do schedule(runtime) default(none) reduction(+: overlap, doverlap) &
+   !$omp shared(mol, bas, trans, list) &
+   !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, ij, &
+   !$omp& r2, vec, stmp, dstmp, inl, img)
+   do iat = 1, mol%nat
+      izp = mol%id(iat)
+      is = bas%ish_at(iat)
+      inl = list%inl(iat)
+      do img = 1, list%nnl(iat)
+         jat = list%nlat(img+inl)
+         itr = list%nltr(img+inl)
+         jzp = mol%id(jat)
+         js = bas%ish_at(jat)
+         if (iat == jat) cycle
+         vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
+         r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
+
+         do ish = 1, bas%nsh_id(izp)
+            ii = bas%iao_sh(is+ish)
+            do jsh = 1, bas%nsh_id(jzp)
+               jj = bas%iao_sh(js+jsh)
+
+               call overlap_grad_cgto(bas%cgto(jsh,jzp), bas%cgto(ish,izp), r2, vec, &
+               & bas%intcut, stmp, dstmp)
+
+               ! Store the overlap and overlap gradient
+               nao = msao(bas%cgto(jsh, jzp)%ang)
+               do iao = 1, msao(bas%cgto(ish, izp)%ang)
+                  do jao = 1, nao
+                     ij = jao + nao*(iao-1)
+
+                     !$omp atomic
+                     overlap(jj+jao, ii+iao) = overlap(jj+jao, ii+iao) &
+                     & + stmp(ij)
+                     !$omp atomic
+                     overlap(ii+iao, jj+jao) = overlap(ii+iao, jj+jao) &
+                     & + stmp(ij)
+
+                     doverlap(:, jj+jao, ii+iao) = doverlap(:, jj+jao, ii+iao) &
+                        & + dstmp(:,ij)
+                     doverlap(:, ii+iao, jj+jao) = doverlap(:, ii+iao, jj+jao) &
+                        & - dstmp(:,ij)
+ 
+                  end do
+               end do
+            end do
+         end do
+      end do 
+   end do
+
+end subroutine get_overlap_lat_gradient
+
+!> Evaluate diatomic frame-scaled overlap and gradients of a orthonormalized basis set for a molecular structure
+subroutine get_overlap_diat_lat_gradient(mol, trans, list, bas, ksig, kpi, kdel, &
+   & overlap, overlap_diat, doverlap, doverlap_diat)
+   !> Molecular structure data
+   type(structure_type), intent(in) :: mol
+   !> Lattice points within a given realspace cutoff
+   real(wp), intent(in) :: trans(:, :)
+   !> Neighbour list
+   type(adjacency_list), intent(in) :: list
+   !> Basis set information
+   class(basis_type), intent(in) :: bas
+   !> Scaling factors for the diatomic frame for each combination of atomic species
+   real(wp), allocatable, intent(in) :: ksig(:,:), kpi(:,:), kdel(:,:)
+   !> Overlap matrix
+   real(wp), intent(out) :: overlap(:, :)
+   !> Overlap matrix with diatomic frame-scaled elements in the diatomic frame
+   real(wp), intent(out) :: overlap_diat(:, :)
+   !> Derivative of the overlap matrix w.r.t. coordinate displacements
+   real(wp), intent(inout) :: doverlap(:, :, :)
+   !> Derivative of the diatomic frame-scaled overlap matrix w.r.t. coordinate displacements
+   real(wp), intent(inout) :: doverlap_diat(:, :, :)
+
+   integer :: iat, jat, izp, jzp, itr, inl, img
+   integer :: ish, jsh, is, js, ii, jj, iao, jao, nao, ij, iaosh, jaosh
+   real(wp) :: r2, vec(3)
+   real(wp), allocatable :: stmp(:), dstmp(:, :)
+   real(wp), allocatable :: block_overlap(:,:), block_doverlap(:,:,:)
+
+   doverlap(:, :, :) = 0.0_wp
+   doverlap_diat(:, :, :) = 0.0_wp
+
+   allocate(stmp(msao(bas%maxl)**2), dstmp(3, msao(bas%maxl)**2), &
+   & block_overlap(smap(bas%maxl+1),smap(bas%maxl+1)), block_doverlap(3,smap(bas%maxl+1),smap(bas%maxl+1)))
+
+   !$omp parallel do schedule(runtime) default(none) reduction(+: overlap, overlap_diat, doverlap, doverlap_diat) &
+   !$omp shared(mol, bas, trans, list, ksig, kpi, kdel) &
+   !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, ij, iaosh, jaosh, &
+   !$omp& r2, vec, stmp, dstmp, block_overlap, block_doverlap, inl, img)
+   do iat = 1, mol%nat
+      izp = mol%id(iat)
+      is = bas%ish_at(iat)
+      inl = list%inl(iat)
+      do img = 1, list%nnl(iat)
+         jat = list%nlat(img+inl)
+         itr = list%nltr(img+inl)
+         jzp = mol%id(jat)
+         js = bas%ish_at(jat)
+         if (iat == jat) cycle
+         vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
+         r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
+         ! Get the overlap gradient integrals for the current diatomic pair
+         block_overlap = 0.0_wp
+         block_doverlap = 0.0_wp
+         do ish = 1, bas%nsh_id(izp)
+            ii = bas%iao_sh(is+ish)
+            iaosh = smap(ish-1) ! Offset for the block overlap matrix
+            do jsh = 1, bas%nsh_id(jzp)
+               jj = bas%iao_sh(js+jsh)
+               jaosh = smap(jsh-1) ! Offset for the block overlap matrix
+               
+               call overlap_grad_cgto(bas%cgto(jsh,jzp), bas%cgto(ish,izp), r2, vec, &
+               & bas%intcut, stmp, dstmp)
+
+               ! Store the overlap and overlap gradient
+               nao = msao(bas%cgto(jsh, jzp)%ang)
+               do iao = 1, msao(bas%cgto(ish, izp)%ang)
+                  do jao = 1, nao
+                     ij = jao + nao*(iao-1)
+
+                     !$omp atomic
+                     block_overlap(jaosh+jao, iaosh+iao) = block_overlap(jaosh+jao, iaosh+iao) &
+                        + stmp(ij)
+                     block_doverlap(:, jaosh+jao, iaosh+iao) = block_doverlap(:, jaosh+jao, iaosh+iao) &
+                        + dstmp(:, ij)
+
+                     !$omp atomic
+                     overlap(jj+jao, ii+iao) = overlap(jj+jao, ii+iao) &
+                        & + stmp(jao + nao*(iao-1))
+                     !$omp atomic
+                     overlap(ii+iao, jj+jao) = overlap(ii+iao, jj+jao) &
+                        & + stmp(jao + nao*(iao-1))
+
+                     doverlap(:, jj+jao, ii+iao) = doverlap(:, jj+jao, ii+iao) &
+                        & + dstmp(:,ij)
+                     doverlap(:, ii+iao, jj+jao) = doverlap(:, ii+iao, jj+jao) &
+                        & - dstmp(:,ij)
+                  end do
+               end do
+            end do
+         end do
+
+         ! Diatomic frame transformation and scaling of the overlap gradient
+         call diat_trafo_grad(block_overlap, block_doverlap, vec, &
+            & ksig(izp,jzp), kpi(izp,jzp), kdel(izp,jzp), bas%nsh_at(jat)-1, bas%nsh_at(iat)-1)
+
+         ! Setup the Hamiltonian gradient and store the diatomic frame scaled overlap gradient. 
+         do ish = 1, bas%nsh_id(izp)
+            ii = bas%iao_sh(is+ish)
+            iaosh = smap(ish-1) ! Offset for the block overlap matrix
+            do jsh = 1, bas%nsh_id(jzp)
+               jj = bas%iao_sh(js+jsh)
+               jaosh = smap(jsh-1) ! Offset for the block overlap matrix
+               
+               nao = msao(bas%cgto(jsh, jzp)%ang)
+               do iao = 1, msao(bas%cgto(ish, izp)%ang)
+                  do jao = 1, nao
+                     ij = jao + nao*(iao-1)
+
+                     !$omp atomic
+                     overlap_diat(jj+jao, ii+iao) = overlap_diat(jj+jao, ii+iao) &
+                        & + block_overlap(jaosh+jao, iaosh+iao)
+                     !$omp atomic
+                     overlap_diat(ii+iao, jj+jao) = overlap_diat(ii+iao, jj+jao) &
+                        & + block_overlap(jaosh+jao, iaosh+iao)
+
+                     doverlap_diat(:, jj+jao, ii+iao) = doverlap_diat(:, jj+jao, ii+iao) &
+                        & + block_doverlap(:, jaosh+jao, iaosh+iao)
+                     doverlap_diat(:, ii+iao, jj+jao) = doverlap_diat(:, ii+iao, jj+jao) &
+                        & - block_doverlap(:, jaosh+jao, iaosh+iao)
+                  end do 
+               end do 
+            end do
+         end do
+      end do
+   end do
+
+end subroutine get_overlap_diat_lat_gradient
+
 
 end module tblite_integral_overlap
