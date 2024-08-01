@@ -34,6 +34,7 @@ set(
   "post-processing"
   "repulsion"
   "slater-expansion"
+  "q-vszp"
   "spin"
   "solvation-born"
   "solvation-cpcm"

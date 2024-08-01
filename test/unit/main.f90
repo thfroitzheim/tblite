@@ -36,6 +36,7 @@ program tester
    use test_ncoord, only : collect_ncoord
    use test_repulsion, only : collect_repulsion
    use test_slater_expansion, only : collect_slater_expansion
+   use test_qvszp, only : collect_qvszp
    use test_spin, only : collect_spin
    use test_solvation_born, only : collect_solvation_born
    use test_solvation_cpcm, only : collect_solvation_cpcm
@@ -67,6 +68,7 @@ program tester
       new_testsuite("double-dictionary", collect_double_dictionary), &
       new_testsuite("post-processing", collect_post_processing), &
       new_testsuite("slater-expansion", collect_slater_expansion), &
+      new_testsuite("q-vszp", collect_qvszp), &
       new_testsuite("cgto-ortho", collect_cgto_ortho), &
       new_testsuite("integral-overlap", collect_integral_overlap), &
       new_testsuite("integral-multipole", collect_integral_multipole), &

@@ -84,7 +84,7 @@ subroutine get_mulliken_atomic_charges_gradient(bas, mol, smat, pmat, dsmat, dpm
    real(wp), allocatable :: tmp(:,:), dpsmat(:,:), pdsmat(:,:), tmp1(:,:)
 
    allocate(tmp(size(dqatdr,2), size(dqatdr,3)), tmp1(bas%nao, bas%nao), dpsmat(bas%nao,bas%nao), pdsmat(bas%nao,bas%nao))
-   write(*,*) "in get_mulliken_atomic_charges_gradient"
+   !write(*,*) "in get_mulliken_atomic_charges_gradient"
    dqatdr = 0.0_wp
 
    ! + ! + ! $omp parallel do default(none) collapse(2) schedule(runtime) reduction(+:qsh) &
@@ -109,7 +109,7 @@ subroutine get_mulliken_atomic_charges_gradient(bas, mol, smat, pmat, dsmat, dpm
          tmp1 = 0.0_wp
 
          tmp1 = smat * dpmatdr(ic,:,:,1) + dsmat(ic,:,:) * pmat(:,:,1) 
-         call write_2d_matrix(tmp1, "s*dp + ds*p")
+         !call write_2d_matrix(tmp1, "s*dp + ds*p")
 
          do iao = 1, bas%nao
             iat = bas%ao2at(iao)

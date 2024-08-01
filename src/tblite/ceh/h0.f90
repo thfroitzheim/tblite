@@ -129,7 +129,7 @@ contains
 
       integer  :: itr, img, inl, ii, jj, is, js, jzp, izp, nao
       integer  :: iat, ish, jat, jsh, k, iao, jao, ij, iaosh, jaosh
-      real(wp) :: hij, rr, r2, vec(3), dtmpj(3)
+      real(wp) :: hij, r2, vec(3), dtmpj(3)
       real(wp), allocatable :: stmp(:), dtmpi(:, :), block_overlap(:,:)
       integer :: kl, l
 
@@ -145,7 +145,7 @@ contains
       !$omp parallel do schedule(runtime) default(none) &
       !$omp shared(mol, bas, trans, list, overlap, overlap_diat, dpint, hamiltonian, h0, selfenergy) &
       !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, ij, iaosh, jaosh, k) &
-      !$omp private(r2, vec, stmp, block_overlap, dtmpi, dtmpj, hij, rr, inl, img)
+      !$omp private(r2, vec, stmp, block_overlap, dtmpi, dtmpj, hij, inl, img)
       do iat = 1, mol%nat
          izp = mol%id(iat)
          is = bas%ish_at(iat)
@@ -157,7 +157,6 @@ contains
             js = bas%ish_at(jat)
             vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
             r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
-            rr = sqrt(sqrt(r2) / (h0%rad(jzp) + h0%rad(izp)))
 
             ! Get the overlap and dipole integrals for the current diatomic pair
             block_overlap = 0.0_wp
@@ -258,13 +257,12 @@ contains
       !$omp parallel do schedule(runtime) default(none) &
       !$omp shared(mol, bas, trans, overlap, overlap_diat, dpint, hamiltonian, h0, selfenergy) &
       !$omp private(iat, izp, itr, is, ish, jsh, ii, jj, iao, jao, nao, ij) &
-      !$omp private(r2, vec, stmp, dtmpi, hij, rr)
+      !$omp private(r2, vec, stmp, dtmpi, hij)
       do iat = 1, mol%nat
          izp = mol%id(iat)
          is = bas%ish_at(iat)
          vec(:) = 0.0_wp
          r2 = 0.0_wp
-         rr = sqrt(sqrt(r2) / (h0%rad(izp) + h0%rad(izp)))
          do ish = 1, bas%nsh_id(izp)
             ii = bas%iao_sh(is+ish)
             do jsh = 1, bas%nsh_id(izp)
@@ -275,9 +273,12 @@ contains
                do iao = 1, msao(bas%cgto(ish, izp)%ang)
                   do jao = 1, nao
                      ij = jao + nao*(iao-1)
+
+                     !$omp atomic
                      overlap(jj+jao, ii+iao) = overlap(jj+jao, ii+iao) &
                         + stmp(ij)
 
+                     !$omp atomic
                      overlap_diat(jj+jao, ii+iao) = overlap_diat(jj+jao, ii+iao) &
                         + stmp(ij)
 
@@ -316,18 +317,18 @@ contains
       real(wp), intent(in) :: dsedL(:, :, :)
       !> Density dependent potential shifts on the Hamiltonian
       type(potential_type), intent(in) :: pot
-      !> Derivative of the electronic energy w.r.t. coordinate displacements
+      !> Derivative of the overlap matrix w.r.t. coordinates
       real(wp), intent(inout) :: doverlap(:, :, :)
-      !> Derivative of the electronic energy w.r.t. coordinate displacements
+      !> Derivative of the diatomic frame-scaled overlap matrix w.r.t. coordinates
       real(wp), intent(inout) :: doverlap_diat(:, :, :)
-      !> Derivative of the electronic energy w.r.t. coordinate displacements
+      !> Derivative of the Hamiltonian matrix w.r.t. coordinates
       real(wp), intent(inout) :: dh0dr(:, :, :)
-      !> Derivative of the electronic energy w.r.t. the lattice vector
+      !> Derivative of the Hamiltonian matrix w.r.t. the lattice vector
       real(wp), intent(inout) :: dh0dL(:, :, :, :)
    
       integer :: iat, jat, izp, jzp, itr, img, inl, spin, nspin
       integer :: ish, jsh, is, js, ii, jj, iao, jao, nao, ij, iaosh, jaosh
-      real(wp) :: rr, r2, vec(3), hij, vij
+      real(wp) :: r2, vec(3), hij, vij
       real(wp), allocatable :: stmp(:), dstmp(:, :)
       real(wp), allocatable :: block_overlap(:, :), block_doverlap(:, :, :)
       real(wp), allocatable :: dhijdr(:, :), dhijdL(:, :), dvijdr(:, :), dvijdL(:, :)
@@ -344,7 +345,7 @@ contains
       !$omp parallel do schedule(runtime) default(none) reduction(+: doverlap, doverlap_diat, dh0dr, dh0dL) &
       !$omp shared(mol, bas, trans, h0, selfenergy, dsedr, dsedL, pot, list) &
       !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, ij, iaosh, jaosh, &
-      !$omp& r2, vec, stmp, dstmp, block_overlap, block_doverlap, hij, vij, dhijdr, dhijdL, dhvjdr, dvijdL, rr, inl, img)
+      !$omp& r2, vec, stmp, dstmp, block_overlap, block_doverlap, hij, vij, dhijdr, dhijdL, dvijdr, dvijdL, inl, img)
       do iat = 1, mol%nat
          izp = mol%id(iat)
          is = bas%ish_at(iat)
@@ -356,7 +357,6 @@ contains
             js = bas%ish_at(jat)
             vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
             r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
-            rr = sqrt(sqrt(r2) / (h0%rad(jzp) + h0%rad(izp)))
             
             ! Setup the potential intermediate for the current atom pair
             vij = - 0.5_wp * (pot%vat(iat, 1) + pot%vat(jat, 1))
@@ -372,7 +372,7 @@ contains
                do jsh = 1, bas%nsh_id(jzp)
                   jj = bas%iao_sh(js+jsh)
                   jaosh = smap(jsh-1) ! Offset for the block overlap matrix
-
+                  
                   call overlap_grad_cgto(bas%cgto(jsh,jzp), bas%cgto(ish,izp), r2, vec, &
                   & bas%intcut, stmp, dstmp)
 
@@ -386,18 +386,14 @@ contains
                         block_overlap(jaosh+jao, iaosh+iao) = block_overlap(jaosh+jao, iaosh+iao) &
                            + stmp(ij)
 
-                        !$omp atomic
                         block_doverlap(:, jaosh+jao, iaosh+iao) = block_doverlap(:, jaosh+jao, iaosh+iao) &
                            + dstmp(:, ij)
 
-                        !$omp atomic
                         doverlap(:, jj+jao, ii+iao) = doverlap(:, jj+jao, ii+iao) &
                            & + dstmp(:,ij)
-                        !$omp atomic
                         doverlap(:, ii+iao, jj+jao) = doverlap(:, ii+iao, jj+jao) &
                            & - dstmp(:,ij)
 
-                        !$omp atomic
                         dh0dr(:, jj+jao, ii+iao) = dh0dr(:, jj+jao, ii+iao) &
                            & + dstmp(:, ij) * vij + stmp(ij) * dvijdr(:, iat)
                         !$omp atomic
@@ -464,8 +460,8 @@ contains
       end do
    
       !$omp parallel do schedule(runtime) default(none) reduction(+:dh0dr) &
-      !$omp shared(mol, bas, dsedr) &
-      !$omp private(iat, izp, jzp, is, ish, ii, iao)
+      !$omp shared(mol, bas, dsedr, pot) &
+      !$omp private(iat, izp, jzp, is, ish, ii, iao, dvijdr, dvijdL)
       do iat = 1, mol%nat
          izp = mol%id(iat)
          is = bas%ish_at(iat)

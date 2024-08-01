@@ -18,4 +18,5 @@ srcs += files(
   'ortho.f90',
   'slater.f90',
   'type.f90',
+  'q-vszp.f90',
 )
