@@ -24,7 +24,7 @@ module tblite_basis_type
    implicit none
    private
 
-   public :: new_basis, get_cutoff
+   public :: new_basis, get_cutoff, integral_cutoff, maxg
 
    !> Maximum contraction length of basis functions.
    !> The limit is chosen as twice the maximum size returned by the STO-NG expansion
@@ -41,6 +41,13 @@ module tblite_basis_type
       !> Contraction coefficients of the primitive Gaussian functions,
       !> might contain normalization
       real(wp) :: coeff(maxg) = 0.0_wp
+      !> Derivative of the Contraction coefficient w.r.t. the atomic positions
+      real(wp), allocatable :: dcoeffdr(:,:,:)
+      !> Derivative of the Contraction coefficient w.r.t. L
+      real(wp), allocatable :: dcoeffdL(:,:,:)
+   contains 
+      !> Scales the coefficient of the cgto 
+      procedure :: scale_cgto
    end type cgto_type
 
    !> Collection of information regarding the basis set of a system
@@ -73,7 +80,10 @@ module tblite_basis_type
       !> Mapping from shells to the respective atom
       integer, allocatable :: sh2at(:)
       !> Contracted Gaussian basis functions forming the basis set
-      type(cgto_type), allocatable :: cgto(:, :)
+      class(cgto_type), allocatable :: cgto(:, :)
+   contains
+      !> Scales the coefficient of the basis
+      procedure :: scale_basis
    end type basis_type
 
    !> Get optimal real space cutoff for integral evaluation
@@ -162,10 +172,76 @@ subroutine new_basis(self, mol, nshell, cgto, acc)
 
 end subroutine new_basis
 
+!> Scale the basis set contraction based on the atomic environment and charge
+subroutine scale_basis(self, mol, qat, cn, norm, expscal, dqatdr, dqatdL, dcndr, dcndL)
+   !> Instance of the basis set data
+   class(basis_type), intent(inout) :: self
+   !> Molecular structure data
+   type(structure_type), intent(in) :: mol
+   !> Atomic charges for the charge scaling of the basis set 
+   real(wp), intent(in) :: qat(:)
+   !> Coordination number
+   real(wp), intent(in) :: cn(:)
+   !> Include normalization in contraction coefficients
+   logical, intent(in) :: norm   
+   !> Exponent scaling factor
+   real(wp), intent(in), optional :: expscal
+   !> Derivative of the specific atomic charge w.r.t. the positions
+   real(wp), intent(in), optional :: dqatdr(:, :, :)
+   !> Derivative of the specific atomic charge w.r.t. the lattice vectors
+   real(wp), intent(in), optional :: dqatdL(:, :, :)
+   !> Derivative of the specific coordination number w.r.t. the positions
+   real(wp), intent(in), optional :: dcndr(:, :, :)
+   !> Derivative of the specific coordination number w.r.t. the lattice vectors
+   real(wp), intent(in), optional :: dcndL(:, :, :)
+
+   integer :: iat, ish
+
+   ! Scale the coefficients for all atoms
+   if(present(dqatdr) .and. present(dqatdL) .and. present(dcndr) .and. present(dcndL)) then
+      do iat = 1, mol%nat
+         do ish = 1, self%nsh_at(iat)
+            call self%cgto(ish, iat)%scale_cgto(qat(iat), cn(iat), norm, expscal, &
+               & dqatdr(:, :, iat), dqatdL(:, :, iat), dcndr(:, :, iat), dcndL(:, :, iat))
+         end do
+      end do
+   else 
+      do iat = 1, mol%nat
+         do ish = 1, self%nsh_at(iat)
+            call self%cgto(ish, iat)%scale_cgto(qat(iat), cn(iat), norm, expscal)
+         end do
+      end do
+   end if
+
+end subroutine scale_basis
+
+!> Dummy procedure to scale the contraction coefficients of the CGTOs
+subroutine scale_cgto(self, qat, cn, norm, expscal, dqatdr, dqatdL, dcndr, dcndL)
+   !> Instance of the basis set data
+   class(cgto_type(*)), intent(inout) :: self
+   !> Atomic charges for the charge scaling of the basis set 
+   real(wp), intent(in) :: qat
+   !> Coordination number
+   real(wp), intent(in) :: cn
+   !> Include normalization in contraction coefficients
+   logical, intent(in) :: norm
+   !> Exponent scaling factor
+   real(wp), intent(in), optional :: expscal
+   !> Derivative of the specific atomic charge w.r.t. the positions (not spin-resolved)
+   real(wp), intent(in), optional :: dqatdr(:, :)
+   !> Derivative of the specific atomic charge w.r.t. the lattice vectors (not spin-resolved)
+   real(wp), intent(in), optional :: dqatdL(:, :)
+   !> Derivative of the specific coordination number w.r.t. the positions
+   real(wp), intent(in), optional :: dcndr(:, :)
+   !> Derivative of the specific coordination number w.r.t. the lattice vectors
+   real(wp), intent(in), optional :: dcndL(:, :)
+
+end
+
 !> Determine required real space cutoff for the basis set
 pure function get_cutoff(self, acc) result(cutoff)
    !> Instance of the basis set data
-   type(basis_type), intent(in) :: self
+   class(basis_type), intent(in) :: self
    !> Accuracy for the integral cutoff
    real(wp), intent(in), optional :: acc
    !> Required realspace cutoff

@@ -880,9 +880,6 @@ module tblite_ceh_ceh
    !> Angular momentum-specific scaling factors for H0 
    real(wp), parameter   :: kll(1:4) = [0.6379_wp, 0.9517_wp, 1.18_wp, 2.84_wp]
 
-   !> Conversion constant
-   real(wp), parameter   :: kt = 3.166808578545117e-06_wp
-
    !> Specification of the CEH hamiltonian
    type, extends(tb_h0spec) :: ceh_h0spec
    contains

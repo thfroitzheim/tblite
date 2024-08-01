@@ -21,6 +21,7 @@ list(
   "${dir}/ortho.f90"
   "${dir}/slater.f90"
   "${dir}/type.f90"
+  "${dir}/q-vszp.f90"
 )
 
 set(srcs "${srcs}" PARENT_SCOPE)
