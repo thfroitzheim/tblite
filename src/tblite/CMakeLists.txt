@@ -26,6 +26,7 @@ add_subdirectory("context")
 add_subdirectory("coulomb")
 add_subdirectory("disp")
 add_subdirectory("data")
+add_subdirectory("exchange")
 add_subdirectory("external")
 add_subdirectory("fit")
 add_subdirectory("integral")
@@ -56,6 +57,7 @@ list(
   "${dir}/data.f90"
   "${dir}/double_dictionary.f90"
   "${dir}/disp.f90"
+  "${dir}/exchange.f90"
   "${dir}/lapack.f90"
   "${dir}/ncoord.f90"
   "${dir}/os.F90"
