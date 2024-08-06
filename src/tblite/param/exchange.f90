@@ -1,3 +1,23 @@
+! This file is part of tblite.
+! SPDX-Identifier: LGPL-3.0-or-later
+!
+! tblite is free software: you can redistribute it and/or modify it under
+! the terms of the GNU Lesser General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+!
+! tblite is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU Lesser General Public License for more details.
+!
+! You should have received a copy of the GNU Lesser General Public License
+! along with tblite.  If not, see <https://www.gnu.org/licenses/>.
+
+!> @file tblite/param/exchange.f90
+!> Provides parameter record for the exchange
+
+!> Defines model for the exchange parameters
 module tblite_param_exchange
     use mctc_env, only : wp, error_type, fatal_error
     use tblite_toml, only : toml_table, get_value, set_value, add_table
@@ -7,8 +27,8 @@ module tblite_param_exchange
 
    public :: count
 
-    character(len=*), parameter :: exchange_label = "mulliken", average_label = "average_scheme" , exp_label = "expsmooth" , frscale_label = "frscale", &
-    & omega_label = "omega", lrscale_label = "lrscale"
+    character(len=*), parameter :: exchange_label = "mulliken", average_label = "average_scheme" , &
+    & exp_label = "expsmooth" , frscale_label = "frscale", omega_label = "omega", lrscale_label = "lrscale"
 
     type, public, extends(serde_record) :: exchange_record
         !> fullrange scale for the K scale

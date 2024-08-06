@@ -101,7 +101,7 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    type(integral_type) :: ints
    real(wp), allocatable :: tmp(:)
    type(potential_type) :: pot
-   type(container_cache) :: ccache, dcache, icache, hcache, rcache, ecache
+   type(container_cache), allocatable :: ccache, dcache, icache, hcache, rcache, ecache
    class(mixer_type), allocatable :: mixer
    type(timer_type) :: timer
    type(error_type), allocatable :: error
@@ -198,6 +198,7 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
 
    if (allocated(calc%exchange)) then
       call timer%push("exchange")
+      allocate(ecache)
       call calc%exchange%update(mol, ecache)
       call timer%pop
    end if 
@@ -381,11 +382,6 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
             call ctx%message(" - "//label(it)//format_time(stime) &
                & //" ("//format_string(int(stime/ttime*100), '(i3)')//"%)")
          end do
-         if (calc%xtbml /= 0) then
-            stime = timer%get("xtb-ml features")
-            call ctx%message(" - "//"xtb-ml features     "//format_time(stime) &
-               & //" ("//format_string(int(stime/ttime*100), '(i3)')//"%)")  
-         end if    
          if (allocated(calc%exchange)) then
             stime = timer%get("exchange")
             call ctx%message(" - "//"exchange     "//format_time(stime) &

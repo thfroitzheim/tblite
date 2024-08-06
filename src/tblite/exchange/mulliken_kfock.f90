@@ -1,3 +1,23 @@
+! This file is part of tblite.
+! SPDX-Identifier: LGPL-3.0-or-later
+!
+! tblite is free software: you can redistribute it and/or modify it under
+! the terms of the GNU Lesser General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+!
+! tblite is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU Lesser General Public License for more details.
+!
+! You should have received a copy of the GNU Lesser General Public License
+! along with tblite.  If not, see <https://www.gnu.org/licenses/>.
+
+!> @file tblite/exchange/mulliken_kfock.f90
+!> Provides an Mulliken approximated Fock exchange interaction
+
+!> Mulliken approximated Fock exchange
 module tblite_mulliken_kfock
    use mctc_env, only : wp, dp
    use mctc_io, only : structure_type
@@ -177,9 +197,11 @@ pure function info(self, verbosity, indent) result(str)
    if (allocated(self%omega)) then
       str= str // nl//indent//"Range separted exchange is used:"// &
          & nl//indent//" * Full-range scale: "//format_string(self%frscale,'(f5.2)')//nl//indent//&
-         & " * Omega: "//format_string(self%omega,'(f5.2)')//nl//indent//" * Long-range scale: "//format_string(self%lrscale,'(f5.2)')
+         & " * Omega: "//format_string(self%omega,'(f5.2)')//nl//indent//&
+         & " * Long-range scale: "//format_string(self%lrscale,'(f5.2)')
    else
-      str = str //nl//indent//"Full range exchange is used"// nl//indent//" * Full-range scale: "//format_string(self%frscale,'(f5.2)')
+      str = str //nl//indent//"Full range exchange is used"// nl//indent//&
+         & " * Full-range scale: "//format_string(self%frscale,'(f5.2)')
    end if
 end function info
 
@@ -320,9 +342,11 @@ subroutine get_potential_w_overlap(self, mol, cache, wfn, pot, overlap)
       allocate(ptr%gamma_(self%nao,self%nao))
       if (allocated(self%omega)) then
          call gamma(self%nao, mol%nat, self%nsh, self%aonum, self%sh2at,&
-            & self%average, self%expsmooth, mol%xyz, self%hardness, self%frscale, self%omega, self%frscale, ptr%gamma_)
+            & self%average, self%expsmooth, mol%xyz, self%hardness, self%frscale, &
+            & self%omega, self%frscale, ptr%gamma_)
       else
-         call  gamma(self%nao, mol%nat, self%nsh, self%aonum, self%sh2at,self%average, self%expsmooth, mol%xyz, self%hardness, self%frscale, ptr%gamma_)
+         call  gamma(self%nao, mol%nat, self%nsh, self%aonum, self%sh2at,&
+            & self%average, self%expsmooth, mol%xyz, self%hardness, self%frscale, ptr%gamma_)
       end if
    end if
 
@@ -413,8 +437,8 @@ subroutine get_gradient_w_overlap(self, mol, cache, wfn, gradient, sigma, overla
 
    call view(cache, ptr)
 
-   call KGradSymSQM(0, self%nao, mol%nat, self%nsh, self%aonum, self%sh2at, ptr%gamma_, &
-      & wfn%density(:, :, 1), overlap, sigma, gradient)
+   !call KGradSymSQM(0, self%nao, mol%nat, self%nsh, self%aonum, self%sh2at, ptr%gamma_, &
+   !   & wfn%density(:, :, 1), overlap, sigma, gradient)
 
 
 
