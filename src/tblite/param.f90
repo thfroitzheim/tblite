@@ -37,7 +37,7 @@ module tblite_param
    use tblite_param_thirdorder, only : thirdorder_record
    use tblite_param_post_processing, only :  post_processing_param_list, molecular_multipole_record
    use tblite_toml, only : toml_table, toml_key, get_value, set_value, add_table
-   use tblite_param_exchange, only : exchange_record
+   use tblite_param_mulliken_kfock, only : mulliken_kfock_record
    implicit none
    private
 
@@ -51,7 +51,7 @@ module tblite_param
       & k_charge = "charge", k_thirdorder = "thirdorder", k_multipole = "multipole", &
       & k_halogen = "halogen", k_hamiltonian = "hamiltonian", k_element = "element", &
       & k_meta = "meta", k_version = "version", k_name = "name", k_reference = "reference", &
-      & k_format = "format", k_exchange = "exchange", k_post_proc = "post-processing"
+      & k_format = "format", k_mulliken_kfock = "mulliken_kfock", k_post_proc = "post-processing"
 
    !> Current parameter format version
    integer, parameter :: current_format = 1
@@ -81,8 +81,8 @@ module tblite_param
       type(thirdorder_record), allocatable :: thirdorder
       !> Element specific parameter records
       type(element_record), allocatable :: record(:)
-      !> Definition of the exchange intercation
-      type(exchange_record), allocatable :: exchange
+      !> Definition of the Mulliken exchange interaction
+      type(mulliken_kfock_record), allocatable :: mulliken_kfock
       !> Abstract post processing class 
       type(post_processing_param_list), allocatable :: post_proc
    contains
@@ -178,10 +178,10 @@ subroutine load_from_toml(self, table, error)
       call self%post_proc%load(child, error)
    end if 
 
-   call get_value(table, k_exchange, child, requested=.false.)
+   call get_value(table, k_mulliken_kfock, child, requested=.false.)
    if (associated(child)) then
-      allocate(self%exchange)
-      call self%exchange%load(child, error)
+      allocate(self%mulliken_kfock)
+      call self%mulliken_kfock%load(child, error)
       if (allocated(error)) return
    end if
 
@@ -259,9 +259,9 @@ subroutine dump_to_toml(self, table, error)
       if (allocated(error)) return
    end if
 
-   if (allocated(self%exchange)) then
-      call add_table(table, k_exchange, child)
-      call self%exchange%dump(child, error)
+   if (allocated(self%mulliken_kfock)) then
+      call add_table(table, k_mulliken_kfock, child)
+      call self%mulliken_kfock%dump(child, error)
       if (allocated(error)) return
    end if
 
@@ -406,8 +406,8 @@ subroutine load_from_array(self, array, base, mask, error)
       if (allocated(error)) return
    end if
 
-   if (allocated(self%exchange)) then
-      call self%exchange%load(array, offset, base%exchange, mask%exchange, error)
+   if (allocated(self%mulliken_kfock)) then
+      call self%mulliken_kfock%load(array, offset, base%mulliken_kfock, mask%mulliken_kfock, error)
       if (allocated(error)) return
    end if
 
@@ -464,8 +464,8 @@ subroutine dump_to_array(self, array, mask, error)
       if (allocated(error)) return
    end if
 
-   if (allocated(self%exchange)) then
-      call self%exchange%dump(array, offset, mask%exchange, error)
+   if (allocated(self%mulliken_kfock)) then
+      call self%mulliken_kfock%dump(array, offset, mask%mulliken_kfock, error)
       if (allocated(error)) return
    end if
 

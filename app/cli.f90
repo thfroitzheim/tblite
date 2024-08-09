@@ -72,6 +72,8 @@ module tblite_cli
       real(wp) :: accuracy = 1.0_wp
       !> Maximum number of iterations for SCF
       integer, allocatable :: max_iter
+      !> Maximum number of iterations for SCF
+      integer, allocatable :: mixer_start
       !> Electronic temperature
       real(wp) :: etemp = 300.0_wp
       !> Electronic temperature for the guess (currently only CEH)

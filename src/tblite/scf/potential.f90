@@ -68,7 +68,7 @@ contains
 
 
 !> Create a new potential object
-subroutine new_potential(self, mol, bas, nspin, grad)
+subroutine new_potential(self, mol, bas, nspin, orbital_resolved, grad)
    !> Instance of the density dependent potential
    type(potential_type), intent(out) :: self
    !> Molecular structure data
@@ -77,6 +77,8 @@ subroutine new_potential(self, mol, bas, nspin, grad)
    type(basis_type), intent(in) :: bas
    !> Number of spin channels
    integer, intent(in) :: nspin
+   !> Whether the potential is orbital resolved
+   logical, intent(in), optional :: orbital_resolved
    !> Flag to indicate if potential gradients are requested
    logical, intent(in), optional :: grad
 
@@ -86,6 +88,11 @@ subroutine new_potential(self, mol, bas, nspin, grad)
 
    allocate(self%vdp(3, mol%nat, nspin))
    allocate(self%vqp(6, mol%nat, nspin))
+   if(present(orbital_resolved)) then
+      if(orbital_resolved) then
+         allocate(self%kao(bas%nao, bas%nao, nspin))
+      end if
+   end if
 
    if(present(grad)) then
       if(grad) then
@@ -110,6 +117,9 @@ subroutine reset(self)
    self%vao(:, :) = 0.0_wp
    self%vdp(:, :, :) = 0.0_wp
    self%vqp(:, :, :) = 0.0_wp
+   if (allocated(self%kao)) then 
+      self%kao(:, :, :) = 0.0_wp
+   end if
 
    if(self%grad) then
       self%dvatdr(:, :, :, :) = 0.0_wp

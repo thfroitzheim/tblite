@@ -43,10 +43,14 @@ module tblite_container_type
       procedure :: get_energy
       !> Evaluate charge dependent potential shift from the interaction
       procedure :: get_potential
+      !> Evaluate charge dependent potential shift from the interaction
+      procedure :: get_potential_w_overlap
       !> Evaluate gradient of charge dependent potential shift from the interaction
       procedure :: get_potential_gradient
       !> Evaluate gradient contributions from the selfconsistent interaction
       procedure :: get_gradient
+      !> Evaluate gradient contributions with overlap dependence from the selfconsistent interaction
+      procedure :: get_gradient_w_overlap
       !> Information on container
       procedure :: info
    end type container_type
@@ -113,6 +117,23 @@ subroutine get_potential(self, mol, cache, wfn, pot)
 end subroutine get_potential
 
 
+!> Evaluate overlap dependent potential shift from the interaction
+subroutine get_potential_w_overlap(self, mol, cache, wfn, pot, overlap)
+   !> Instance of the interaction container
+   class(container_type), intent(in) :: self
+   !> Molecular structure data
+   type(structure_type), intent(in) :: mol
+   !> Cached data between different runs
+   type(container_cache), intent(inout) :: cache
+   !> Wavefunction data
+   type(wavefunction_type), intent(in) :: wfn
+   !> Density dependent potential
+   type(potential_type), intent(inout) :: pot
+   !> Overlap integral matrix
+   real(wp), intent(in) :: overlap(:,:)
+end subroutine get_potential_w_overlap
+
+
 !> Evaluate charge dependent potential shift from the interaction
 subroutine get_potential_gradient(self, mol, cache, wfn, pot)
    !> Instance of the interaction container
@@ -143,6 +164,24 @@ subroutine get_gradient(self, mol, cache, wfn, gradient, sigma)
    !> Interaction virial
    real(wp), contiguous, intent(inout) :: sigma(:, :)
 end subroutine get_gradient
+
+
+subroutine get_gradient_w_overlap(self, mol, cache, wfn, gradient, sigma, overlap)
+   !> Instance of the interaction container
+   class(container_type), intent(in) :: self
+   !> Molecular structure data
+   type(structure_type), intent(in) :: mol
+   !> Cached data between different runs
+   type(container_cache), intent(inout) :: cache
+   !> Wavefunction data
+   type(wavefunction_type), intent(in) :: wfn
+    !> Molecular gradient of the exchange energy
+   real(wp), contiguous, intent(inout) :: gradient(:, :)
+   !> Strain derivatives of the exchange energy
+   real(wp), contiguous, intent(inout) :: sigma(:, :)
+   !> Overlap integral matrix
+   real(wp), intent(in) :: overlap(:,:)
+end subroutine get_gradient_w_overlap
 
 
 !> Get information about density dependent quantities used in the energy

@@ -32,7 +32,7 @@ module tblite_param_mask
    use tblite_param_thirdorder, only : thirdorder_mask, count
    use tblite_toml, only : toml_table, toml_array, toml_key, get_value, set_value, &
       & add_table, add_array
-   use tblite_param_exchange, only : exchange_record, exchange_mask, count
+   use tblite_param_mulliken_kfock, only : mulliken_kfock_record, mulliken_kfock_mask, count
    implicit none
    private
 
@@ -47,7 +47,7 @@ module tblite_param_mask
       logical :: multipole = .false.
       logical :: halogen = .false.
       logical :: thirdorder = .false.
-      logical :: exchange = .false.
+      logical :: mulliken_kfock = .false.
    end type allowed_records
 
 
@@ -67,8 +67,8 @@ module tblite_param_mask
       type(halogen_mask), allocatable :: halogen
       !> Definition of the isotropic third-order charge interactions
       type(thirdorder_mask), allocatable :: thirdorder
-      !> Definition of the exchange interaction
-      type(exchange_mask), allocatable :: exchange
+      !> Definition of the Mulliken exchange interaction
+      type(mulliken_kfock_mask), allocatable :: mulliken_kfock
       !> Element specific parameter masks
       type(element_mask), allocatable :: record(:)
       !> Reference to base parametrization
@@ -143,8 +143,8 @@ subroutine load_from_toml(self, table, error)
       allocate(self%thirdorder)
    end if
 
-   call get_value(table, "exchange", child, requested=.false.)
-   allowed%exchange = associated(child)
+   call get_value(table, "mulliken_kfock", child, requested=.false.)
+   allowed%mulliken_kfock = associated(child)
    if (associated(child)) then
       allocate(self%thirdorder)
    end if
@@ -357,8 +357,8 @@ subroutine dump_to_toml(self, table, error)
       call add_table(table, "thirdorder", child)
    end if
 
-   if (allocated(self%exchange)) then
-      call add_table(table, "exchange", child)
+   if (allocated(self%mulliken_kfock)) then
+      call add_table(table, "mulliken_kfock", child)
    end if
 
    call add_table(table, "element", child)
@@ -451,7 +451,7 @@ elemental function count_mask(mask) result(ncount)
    if (allocated(mask%charge)) ncount = ncount + count(mask%charge)
    if (allocated(mask%multipole)) ncount = ncount + count(mask%multipole)
    if (allocated(mask%thirdorder)) ncount = ncount + count(mask%thirdorder)
-   if (allocated(mask%exchange)) ncount = ncount + count(mask%exchange)
+   if (allocated(mask%mulliken_kfock)) ncount = ncount + count(mask%mulliken_kfock)
    if (allocated(mask%record)) ncount = ncount + sum(count(mask%record))
 end function count_mask
 

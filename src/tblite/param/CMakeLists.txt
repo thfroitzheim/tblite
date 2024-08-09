@@ -23,7 +23,7 @@ list(
   "${dir}/charge.f90"
   "${dir}/dispersion.f90"
   "${dir}/element.f90"
-  "${dir}/exchange.f90"
+  "${dir}/mulliken_kfock.f90"
   "${dir}/halogen.f90"
   "${dir}/hamiltonian.f90"
   "${dir}/mask.f90"

@@ -22,7 +22,6 @@ module tblite_coulomb_thirdorder
    use mctc_env, only : wp
    use mctc_io, only : structure_type
    use tblite_container_cache, only : container_cache
-   use tblite_coulomb_charge, only : effective_coulomb
    use tblite_coulomb_multipole, only : damped_multipole
    use tblite_coulomb_type, only : coulomb_type
    use tblite_scf_potential, only : potential_type

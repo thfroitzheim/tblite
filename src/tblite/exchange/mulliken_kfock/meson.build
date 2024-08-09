@@ -14,10 +14,8 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with tblite.  If not, see <https://www.gnu.org/licenses/>.
 
-subdir('mulliken_kfock')
-
 srcs += files(
-  'cache.f90',
-  'mulliken_kfock.f90',
+  'matrix.f90',
+  'sqmbox.f90',
   'type.f90'
 )

@@ -31,10 +31,21 @@ module tblite_exchange_cache
 
 
    type :: exchange_cache
-      real(dp), allocatable :: curr_D(:, :)
-      real(dp), allocatable :: ref_D(:, :)
-      real(dp), allocatable :: prev_F(:, :)
-      real(dp), allocatable :: gamma_(:,:)
+      real(wp) :: alpha
+      type(wignerseitz_cell) :: wsc
+      !> Exchange matrix
+      real(wp), allocatable :: gmat(:, :)
+      !> Overlap times density matrix intermediate
+      real(wp), allocatable :: SP(:, :, :)
+
+      !> Note whether previous Fock matrix is available 
+      logical :: has_prev_F = .false. 
+      !> Reference density matrix for incremental build
+      real(dp), allocatable :: ref_P(:, :, :)
+      !> Reference Fock matrix for incremental build
+      real(dp), allocatable :: ref_F(:, :, :)
+      !> Previously calculated Fock matrix contribution 
+      real(dp), allocatable :: prev_F(:, :, :)
    contains
       procedure :: update
    end type exchange_cache
@@ -49,6 +60,10 @@ subroutine update(self, mol)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
 
+   if (any(mol%periodic)) then
+      call new_wignerseitz_cell(self%wsc, mol)
+      call get_alpha(mol%lattice, self%alpha, .false.)
+   end if
 
 end subroutine update
 

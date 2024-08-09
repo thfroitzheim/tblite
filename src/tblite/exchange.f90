@@ -23,34 +23,65 @@
 !> Proxy module for handling exchange-type interactions
 module tblite_exchange
    use mctc_env, only : wp
-   use tblite_mulliken_kfock, only : mulliken_kfock_type, new_mulliken_exchange
+   use tblite_mulliken_kfock, only : mulliken_kfock_type
+   use tblite_mulliken_kfock_matrix, only : mulliken_kfock_matrix, new_mulliken_exchange_matrix
+   use tblite_mulliken_kfock_sqmbox, only : mulliken_kfock_sqmbox, new_mulliken_exchange_sqmbox
    use mctc_io, only : structure_type
-   use tblite_param_exchange, only : exchange_record
    use tblite_exchange_type, only : exchange_type
    use tblite_basis_type, only : basis_type
    implicit none
    private
-   public :: new_exchange
+
+   public :: new_mulliken_exchange, exchange_type
+   logical, parameter :: sqmbox = .false.
 
 contains
-subroutine new_exchange(self, mol, hardness, par, bas)
-   !> Instance of the multipole container
-   class(exchange_type), allocatable ,intent(inout) :: self
+
+!> Create a new Mulliken approximated exchange container
+!> Screen the choice of the exchange implementation
+subroutine new_mulliken_exchange(self, mol, bas, hubbard, shell_resolved_hubbard, &
+   & average, gexp, frscale, omega, lrscale, incremental, allowsingle)
+   !> Instance of the exchange container
+   class(exchange_type), allocatable, intent(out) :: self
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
-   real(wp), intent(in) :: hardness(:)
-   type(exchange_record) :: par
-   type(basis_type) :: bas
+   !> Description of the basis set
+   type(basis_type), intent(in) :: bas
+   !> Hubbard parameter for all shells and species
+   real(wp), intent(in) :: hubbard(:, :)
+   !> Whether the Hubbard parameters are shell-dependent
+   logical :: shell_resolved_hubbard
+   !> Averaging scheme for Hubbard: 0 = arith., 1 = geom., 2 = arith.
+   real(wp), intent(in) :: average
+   !> Smoothening exponent; 1 = Mataga-Nishimoto, 2 = Klopman-Ohno
+   real(wp), intent(in) :: gexp
+   !> fullrange scale for K
+   real(wp), intent(in) :: frscale
+   !> omega if range seperated exchange is used
+   real(wp), intent(in), optional :: omega
+   !> long range sclae for range seperated exchange treatment
+   real(wp), intent(in), optional :: lrscale
+   !> allow single precision , incremental Fock Build
+   logical, intent(in), optional :: allowsingle, incremental
 
-   if (par%mulliken) then
+   if (sqmbox) then
       block
-         type(mulliken_kfock_type), allocatable :: tmp
+         type(mulliken_kfock_sqmbox), allocatable :: tmp
          allocate(tmp)
-         call new_mulliken_exchange(tmp, mol, hardness, .false., .false., par%frscale, &
-            & par%omega, par%lrscale, par%average, par%expsmooth, bas)
+         call new_mulliken_exchange_sqmbox(tmp, mol, bas, hubbard, &
+            & allowsingle, incremental, average, gexp, frscale, omega, lrscale)
+            call move_alloc(tmp, self)
+      end block
+   else
+      block 
+         type(mulliken_kfock_matrix), allocatable :: tmp
+         allocate(tmp)
+         call new_mulliken_exchange_matrix(tmp, mol, bas, hubbard, &
+            & shell_resolved_hubbard, average, gexp, frscale, omega, lrscale)
          call move_alloc(tmp, self)
       end block
    end if
-end subroutine
+
+end subroutine new_mulliken_exchange
 
 end module tblite_exchange

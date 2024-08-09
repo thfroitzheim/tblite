@@ -35,7 +35,7 @@ module tblite_coulomb_charge_effective
    private
 
    public :: new_effective_coulomb
-   public :: average_interface, harmonic_average, arithmetic_average, geometric_average
+   public :: average_interface, harmonic_average, arithmetic_average, geometric_average, general_average
 
 
    !> Effective, Klopman-Ohno-type, second-order electrostatics
@@ -56,12 +56,14 @@ module tblite_coulomb_charge_effective
 
    abstract interface
       !> Average Hubbard parameter for two shells
-      pure function average_interface(gi, gj) result(gij)
+      pure function average_interface(gi, gj, interpolate) result(gij)
          import :: wp
          !> Hubbard parameter of shell i
          real(wp), intent(in) :: gi
          !> Hubbard parameter of shell j
          real(wp), intent(in) :: gj
+         !> Parameter to smoothely interpolate between different averages 
+         real(wp), intent(in), optional :: interpolate
          !> Averaged Hubbard parameter
          real(wp) :: gij
       end function average_interface
@@ -139,11 +141,13 @@ end subroutine new_effective_coulomb
 
 
 !> Harmonic averaging functions for hardnesses in GFN1-xTB
-pure function harmonic_average(gi, gj) result(gij)
+pure function harmonic_average(gi, gj, interpolate) result(gij)
    !> Hubbard parameter of shell i
    real(wp), intent(in) :: gi
    !> Hubbard parameter of shell j
    real(wp), intent(in) :: gj
+   !> Parameter to smoothely interpolate between different averages (not used)
+   real(wp), intent(in), optional :: interpolate
    !> Averaged Hubbard parameter
    real(wp) :: gij
 
@@ -153,11 +157,13 @@ end function harmonic_average
 
 
 !> Arithmetic averaging functions for hardnesses in GFN2-xTB
-pure function arithmetic_average(gi, gj) result(gij)
+pure function arithmetic_average(gi, gj, interpolate) result(gij)
    !> Hubbard parameter of shell i
    real(wp), intent(in) :: gi
    !> Hubbard parameter of shell j
    real(wp), intent(in) :: gj
+   !> Parameter to smoothely interpolate between different averages (not used)
+   real(wp), intent(in), optional :: interpolate
    !> Averaged Hubbard parameter
    real(wp) :: gij
 
@@ -167,17 +173,39 @@ end function arithmetic_average
 
 
 !> Geometric averaging functions for hardnesses
-pure function geometric_average(gi, gj) result(gij)
+pure function geometric_average(gi, gj, interpolate) result(gij)
    !> Hubbard parameter of shell i
    real(wp), intent(in) :: gi
    !> Hubbard parameter of shell j
    real(wp), intent(in) :: gj
+   !> Parameter to smoothely interpolate between different averages (not used)
+   real(wp), intent(in), optional :: interpolate
    !> Averaged Hubbard parameter
    real(wp) :: gij
 
    gij = sqrt(gi*gj)
 
 end function geometric_average
+
+
+!> Interpolated general averaging functions for hardnesses
+!> (0) arithmetic, (1) geometric, (2) harmonic
+pure function general_average(gi, gj, interpolate) result(gij)
+   !> Hubbard parameter of shell i
+   real(wp), intent(in) :: gi
+   !> Hubbard parameter of shell j
+   real(wp), intent(in) :: gj
+   !> Parameter to smoothely interpolate between different averages (not used)
+   real(wp), intent(in), optional :: interpolate
+   !> Averaged Hubbard parameter
+   real(wp) :: gij
+
+   real(wp) :: tmp
+
+   tmp = 2.0_wp/(gi+gj)
+   gij = tmp**(interpolate-1.0_wp)*(gi*gj)**(interpolate/2.0_wp)
+
+end function general_average
 
 
 !> Evaluate coulomb matrix

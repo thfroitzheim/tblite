@@ -23,7 +23,7 @@
 !> Proxy module for defining isotropic electrostatic interactions
 module tblite_coulomb_charge
    use tblite_coulomb_charge_effective, only : effective_coulomb, new_effective_coulomb, &
-      & average_interface, harmonic_average, arithmetic_average, geometric_average
+      & average_interface, harmonic_average, arithmetic_average, geometric_average, general_average
    use tblite_coulomb_charge_gamma, only : gamma_coulomb, new_gamma_coulomb
    use tblite_coulomb_charge_type, only : coulomb_charge_type
    implicit none
@@ -31,7 +31,8 @@ module tblite_coulomb_charge
 
    public :: coulomb_charge_type, coulomb_kernel
    public :: effective_coulomb, new_effective_coulomb
-   public :: average_interface, harmonic_average, arithmetic_average, geometric_average
+   public :: average_interface, harmonic_average, arithmetic_average, &
+      & geometric_average, general_average
    public :: gamma_coulomb, new_gamma_coulomb
 
 

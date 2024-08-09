@@ -152,6 +152,7 @@ subroutine run_main(config, error)
    if (allocated(error)) return
 
    if (allocated(config%max_iter)) calc%max_iter = config%max_iter
+   if (allocated(config%mixer_start)) calc%mixer_start = config%mixer_start
 
    call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, nspin, config%etemp * kt)
 

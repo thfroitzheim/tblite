@@ -33,7 +33,7 @@ module tblite_coulomb_charge_type
 
    !> General second-order electrostatics
    type, public, extends(coulomb_type), abstract :: coulomb_charge_type
-      !> Whether the third order contribution is shell-dependent
+      !> Whether the second-order contribution is shell-dependent
       logical :: shell_resolved
       !> Number of shells for each atom
       integer, allocatable :: nshell(:)

@@ -14,10 +14,13 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with tblite.  If not, see <https://www.gnu.org/licenses/>.
 
-subdir('mulliken_kfock')
+set(dir "${CMAKE_CURRENT_SOURCE_DIR}")
 
-srcs += files(
-  'cache.f90',
-  'mulliken_kfock.f90',
-  'type.f90'
+list(
+  APPEND srcs
+  "${dir}/matrix.f90"
+  "${dir}/sqmbox.f90"
+  "${dir}/type.f90"
 )
+
+set(srcs "${srcs}" PARENT_SCOPE)

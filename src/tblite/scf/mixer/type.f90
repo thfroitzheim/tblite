@@ -26,6 +26,8 @@ module tblite_scf_mixer_type
 
    !> Abstract base class for electronic mixing
    type, public, abstract :: mixer_type
+      !> Iteration to start mixing
+      integer :: start
    contains
       !> Apply mixing to the density
       procedure(next), deferred :: next

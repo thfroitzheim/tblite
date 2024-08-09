@@ -43,7 +43,7 @@ module tblite_xtb_calculator
    use tblite_xtb_h0, only : tb_hamiltonian, new_hamiltonian
    use tblite_xtb_spec, only : tb_h0spec
    use tblite_exchange_type, only : exchange_type
-   use tblite_exchange, only : new_exchange
+   use tblite_exchange, only : new_mulliken_exchange
 
    implicit none
    private
@@ -56,6 +56,9 @@ module tblite_xtb_calculator
 
    !> Default maximum number of self-consistent iterations
    integer, parameter :: max_iter_default = 250
+
+   !> Default start of the mixing
+   integer, parameter :: mixer_start_default = 0
 
    !> Extended tight-binding calculator
    type, public :: xtb_calculator
@@ -81,6 +84,8 @@ module tblite_xtb_calculator
       real(wp) :: mixer_damping = mixer_damping_default
       !> Maximum number of self-consistent iteractions
       integer :: max_iter = max_iter_default
+      !> Iteration to start the mixing
+      integer :: mixer_start = mixer_start_default
       !> Store calculated integral intermediates
       logical :: save_integrals = .false.
       !> List of additional interaction containers
@@ -205,26 +210,6 @@ subroutine add_basis(calc, mol, param, irc)
 
 end subroutine add_basis
 
-subroutine add_exchange(calc, mol, param, irc)
-   !> Instance of the xTB evaluator
-   type(xtb_calculator), intent(inout) :: calc
-   !> Molecular structure data
-   type(structure_type), intent(in) :: mol
-   !> Parametrization records
-   type(param_record), intent(in) :: param
-   !> Record identifiers
-   integer, intent(in) :: irc(:)
-   !> Chemical hardness sorted by shell 
-   real(wp),allocatable :: hardness(:)
-
-   if (allocated(param%exchange)) then 
-      call get_shell_hardness_non_unique(mol, param, irc, hardness)
-      associate(par => param%exchange)
-      call new_exchange(calc%exchange, mol, hardness, par, calc%bas) 
-      end associate
-   end if
-end subroutine add_exchange
-
 subroutine add_ncoord(calc, mol, param)
    !> Instance of the xTB evaluator
    type(xtb_calculator), intent(inout) :: calc
@@ -238,7 +223,6 @@ subroutine add_ncoord(calc, mol, param)
    end if
 end subroutine add_ncoord
 
-
 subroutine add_hamiltonian(calc, mol, param, irc)
    !> Instance of the xTB evaluator
    type(xtb_calculator), intent(inout) :: calc
@@ -251,7 +235,6 @@ subroutine add_hamiltonian(calc, mol, param, irc)
 
    call new_hamiltonian(calc%h0, mol, calc%bas, new_param_h0spec(mol, param, irc))
 end subroutine add_hamiltonian
-
 
 subroutine add_dispersion(calc, mol, param)
    !> Instance of the xTB evaluator
@@ -299,7 +282,6 @@ subroutine add_repulsion(calc, mol, param, irc)
       & param%repulsion%klight, rep_rexp)
 
 end subroutine add_repulsion
-
 
 subroutine add_halogen(calc, mol, param, irc)
    !> Instance of the xTB evaluator
@@ -388,6 +370,29 @@ subroutine add_coulomb(calc, mol, param, irc)
 
 end subroutine add_coulomb
 
+subroutine add_exchange(calc, mol, param, irc)
+   !> Instance of the xTB evaluator
+   type(xtb_calculator), intent(inout) :: calc
+   !> Molecular structure data
+   type(structure_type), intent(in) :: mol
+   !> Parametrization records
+   type(param_record), intent(in) :: param
+   !> Record identifiers
+   integer, intent(in) :: irc(:)
+   !> Chemical hardness sorted by shell 
+   real(wp), allocatable :: hardness(:, :)
+
+   if (allocated(param%mulliken_kfock)) then 
+      call get_shell_hardness(mol, param, irc, hardness)
+      associate(par => param%mulliken_kfock)
+      call new_mulliken_exchange(calc%exchange, mol, calc%bas, &
+         & hardness, .true., par%average, par%gexp, &
+         & par%frscale, par%omega, par%lrscale, .false., .false.)
+      end associate
+   end if
+
+end subroutine add_exchange
+
 
 subroutine get_average(average_type, averager)
    character(len=*), intent(in) :: average_type
@@ -403,7 +408,6 @@ subroutine get_average(average_type, averager)
       averager => arithmetic_average
    end select
 end subroutine get_average
-
 
 subroutine get_shell_hardness(mol, param, irc, hardness)
    !> Molecular structure data
@@ -427,37 +431,6 @@ subroutine get_shell_hardness(mol, param, irc, hardness)
       end do
    end do
 end subroutine get_shell_hardness
-
-subroutine get_shell_hardness_non_unique(mol, param, irc, hardness)
-   !> Molecular structure data
-   type(structure_type), intent(in) :: mol
-   !> Parametrization records
-   type(param_record), intent(in) :: param
-   !> Record identifiers
-   integer, intent(in) :: irc(:)
-   !> Shell resolved hardness parameters
-   real(wp), allocatable, intent(out) :: hardness(:)
-
-   integer :: isp, ir, ish, il, nsh, count
-   nsh = 0
-   do isp = 1 , mol%nat
-      ir = irc(mol%id(isp))
-      nsh = nsh + param%record(ir)%nsh
-   end do 
-
-   allocate(hardness(nsh),source=0.0_wp)
-   count = 0
-   do isp = 1 , mol%nat
-      ir = irc(mol%id(isp))
-      do ish = 1, param%record(ir)%nsh
-         il = param%record(ir)%lsh(ish)
-         count = count + 1
-         hardness(count) = param%record(ir)%gam * param%record(ir)%lgam(ish)
-      end do
-   end do
-
-end subroutine get_shell_hardness_non_unique
-
 
 subroutine get_hubbard_derivs(mol, param, irc, hubbard_derivs)
    !> Molecular structure data

@@ -280,6 +280,31 @@ subroutine set_calculator_max_iter_api(vctx, vcalc, max_iter) &
 end subroutine set_calculator_max_iter_api
 
 
+subroutine set_calculator_mixer_start_api(vctx, vcalc, mixer_start) &
+   & bind(C, name=namespace//"set_calculator_mixer_start")
+type(c_ptr), value :: vctx
+type(vp_context), pointer :: ctx
+type(c_ptr), value :: vcalc
+type(vp_calculator), pointer :: calc
+integer(c_int), value :: mixer_start
+type(error_type), allocatable :: error
+
+if (debug) print '("[Info]", 1x, a)', "set_calculator_mixer_start"
+
+if (.not.c_associated(vctx)) return
+call c_f_pointer(vctx, ctx)
+
+if (.not.c_associated(vcalc)) then
+   call fatal_error(error, "Calculator object is missing")
+   call ctx%ptr%set_error(error)
+   return
+end if
+call c_f_pointer(vcalc, calc)
+
+calc%ptr%mixer_start = mixer_start
+end subroutine set_calculator_mixer_start_api
+
+
 subroutine set_calculator_guess_api(vctx, vcalc, guess) &
       & bind(C, name=namespace//"set_calculator_guess")
    type(c_ptr), value :: vctx

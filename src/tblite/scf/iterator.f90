@@ -91,7 +91,7 @@ subroutine next_scf(iscf, mol, bas, wfn, solver, mixer, info, coulomb, dispersio
    real(wp), allocatable :: eao(:)
    real(wp) :: ts
 
-   if (iscf > 1) then
+   if (iscf > mixer%start) then
       call mixer%next(error)
       if (allocated(error)) return
       call get_mixer(mixer, bas, wfn, info)
@@ -108,12 +108,12 @@ subroutine next_scf(iscf, mol, bas, wfn, solver, mixer, info, coulomb, dispersio
    if (present(interactions)) then
       call interactions%get_potential(mol, icache, wfn, pot)
    end if
-   if (present(exchange) .and. iscf > 1) then 
+   if (present(exchange) .and. iscf > mixer%start) then 
       call exchange%get_potential_w_overlap(mol, ecache, wfn, pot, ints%overlap)
    end if
    call add_pot_to_h1(bas, ints, pot, wfn%coeff)
    
-   if (iscf > 1) call set_mixer(mixer, wfn, info)
+   if (iscf > mixer%start) call set_mixer(mixer, wfn, info)
 
    call get_density(wfn, solver, ints, ts, error)
    if (allocated(error)) return
@@ -127,7 +127,7 @@ subroutine next_scf(iscf, mol, bas, wfn, solver, mixer, info, coulomb, dispersio
    call get_mulliken_atomic_multipoles(bas, ints%quadrupole, wfn%density, &
       & wfn%qpat)
 
-   if (iscf > 1) call  diff_mixer(mixer, wfn, info)
+   if (iscf > mixer%start) call  diff_mixer(mixer, wfn, info)
 
    allocate(eao(bas%nao), source=0.0_wp)
    call get_electronic_energy(ints%hamiltonian, wfn%density, eao)
@@ -143,7 +143,7 @@ subroutine next_scf(iscf, mol, bas, wfn, solver, mixer, info, coulomb, dispersio
    if (present(interactions)) then
       call interactions%get_energy(mol, icache, wfn, energies)
    end if
-   if (present(exchange).and. iscf > 1) then 
+   if (present(exchange).and. iscf > mixer%start) then 
       call exchange%get_energy(mol, ecache, wfn, energies)
    end if
 end subroutine next_scf
@@ -230,7 +230,6 @@ function get_mixer_dimension(mol, bas, info) result(ndim)
       ndim = ndim + bas%nao*bas%nao
    end select
 
-   write(*,*) ndim
 end function get_mixer_dimension
 
 subroutine set_mixer(mixer, wfn, info)

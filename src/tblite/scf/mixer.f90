@@ -40,17 +40,22 @@ module tblite_scf_mixer
 contains
 
 !> Create a new instance of the mixer
-subroutine new_mixer(self, memory, ndim, damp)
+subroutine new_mixer(self, memory, ndim, damp, start)
    !> Instance of the mixer on exit
    class(mixer_type), allocatable, intent(out) :: self
+   !> Dimension of the subspace used for extrapolation
    integer, intent(in) :: memory
+   !> Size of the extrapolated quantity
    integer, intent(in) :: ndim
+   !> Damping parameter
    real(wp), intent(in) :: damp
+   !> Iteration to start mixing
+   integer, intent(in) :: start
 
    block
       type(broyden_mixer), allocatable :: mixer
       allocate(mixer)
-      call new_broyden(mixer, ndim, broyden_input(memory, damp))
+      call new_broyden(mixer, ndim, broyden_input(memory, damp, start))
       call move_alloc(mixer, self)
    end block
 end subroutine new_mixer

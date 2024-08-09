@@ -34,6 +34,8 @@ module tblite_scf_mixer_broyden
       integer :: memory
       !> Damping parameter
       real(wp) :: damp
+      !> Starting iteration
+      integer :: start
    end type broyden_input
 
    !> Electronic mixer using modified Broyden scheme
@@ -84,6 +86,7 @@ subroutine new_broyden(self, ndim, input)
    self%idif = 0
    self%iget = 0
    self%damp = input%damp
+   self%start = input%start
    allocate(self%df(ndim, input%memory))
    allocate(self%u(ndim, input%memory))
    allocate(self%a(input%memory, input%memory))
