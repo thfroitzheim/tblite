@@ -28,13 +28,21 @@ module tblite_param_repulsion
    public :: count
 
 
-   character(len=*), parameter :: k_effective = "effective", k_kexp = "kexp", &
-      & k_klight = "klight"
+   character(len=*), parameter :: k_gfn = "gfn", k_gp3 = "gp3", k_kexp = "kexp", &
+      & k_klight = "klight", k_rexp = "rexp", k_exp_cn = "exp_cn"
 
    !> Parametrization records describing the repulsion interactions
    type, public, extends(serde_record) :: repulsion_record
+      !> Repulsion type
+      character(len=:), allocatable :: rep_type
+      !> Exponent of the repulsion polynomial
+      real(wp) :: rexp
+      !> Distance exponent for repulsion damping
       real(wp) :: kexp
+      !> Distance exponent for repulsion damping of light atom pairs
       real(wp) :: klight
+      !> Exponent of the repulsion CN
+      real(wp) :: exp_cn
    contains
       generic :: load => load_from_array
       generic :: dump => dump_to_array
@@ -74,23 +82,64 @@ subroutine load_from_toml(self, table, error)
    type(toml_table), pointer :: child
    integer :: stat
 
-   call get_value(table, k_effective, child, requested=.false.)
-   if (.not.associated(child)) then
-      call fatal_error(error, "No entry for effective repulsion found")
+
+   if (.not.any([table%has_key(k_gfn), table%has_key(k_gp3)])) then
+      call fatal_error(error, "Repulsion model not found")
       return
    end if
 
-   call get_value(child, k_kexp, self%kexp, stat=stat)
+   ! Read the GFN type repulsion model 
+   call get_value(table, k_gfn, child, requested=.false., stat=stat)
    if (stat /= 0) then
-      call fatal_error(error, "Invalid entry for repulsion exponent")
+      call fatal_error(error, "Cannot read GFN repulsion table")
       return
+   end if
+   if (associated(child)) then
+      self%rep_type = "gfn"
+
+      call get_value(child, k_kexp, self%kexp, stat=stat)
+      if (stat /= 0) then
+         call fatal_error(error, "Invalid entry for repulsion exponent")
+         return
+      end if
+
+      call get_value(child, k_klight, self%klight, self%kexp, stat=stat)
+      if (stat /= 0) then
+         call fatal_error(error, "Invalid entry for light-atom repulsion exponent")
+         return
+      end if
+      
+      call get_value(child, k_rexp, self%rexp, 1.0_wp, stat=stat)
+      if (stat /= 0) then
+         call fatal_error(error, "Invalid entry for the repulsion polynomial exponent")
+         return
+      end if
    end if
 
-   call get_value(child, k_klight, self%klight, self%kexp, stat=stat)
+   ! Read the GP3 type repulsion model 
+   call get_value(table, k_gp3, child, requested=.false., stat=stat)
    if (stat /= 0) then
-      call fatal_error(error, "Invalid entry for light-atom repulsion exponent")
+      call fatal_error(error, "Cannot read GP3 repulsion table")
       return
    end if
+   if (associated(child)) then
+      self%rep_type = "gp3"
+      
+      call get_value(child, k_exp_cn, self%exp_cn, 1.812_wp, stat=stat)
+      if (stat /= 0) then
+         call fatal_error(error, "Invalid entry for exponent of repulsion CN")
+         return
+      end if
+
+      call get_value(child, k_rexp, self%rexp, 1.0_wp, stat=stat)
+      if (stat /= 0) then
+         call fatal_error(error, "Invalid entry for the repulsion polynomial exponent")
+         return
+      end if
+   end if
+
+
+
 end subroutine load_from_toml
 
 
@@ -105,10 +154,17 @@ subroutine dump_to_toml(self, table, error)
 
    type(toml_table), pointer :: child
 
-   call add_table(table, k_effective, child)
-   call set_value(child, k_kexp, self%kexp)
-   if (abs(self%kexp - self%klight) > epsilon(self%kexp)) then
-      call set_value(child, k_klight, self%klight)
+   if (self%rep_type == "gfn") then
+      call add_table(table, k_gfn, child)
+      call set_value(child, k_kexp, self%kexp)
+      if (abs(self%kexp - self%klight) > epsilon(self%kexp)) then
+         call set_value(child, k_klight, self%klight)
+      end if
+      call set_value(child, k_rexp, self%rexp)
+   else
+      call add_table(table, k_gp3, child)
+      call set_value(child, k_exp_cn, self%exp_cn)
+      call set_value(child, k_rexp, self%rexp)
    end if
 
 end subroutine dump_to_toml

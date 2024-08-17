@@ -85,13 +85,15 @@ contains
 
 
 !> Update container cache
-subroutine update(self, mol, cache)
+subroutine update(self, mol, cache, wfn)
    !> Instance of the interaction container
    class(container_list), intent(in) :: self
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Cached data between different runs
    type(container_cache), intent(inout) :: cache
+   !> Optional auxiliary wavefunction data
+   type(wavefunction_type), intent(in), optional :: wfn
 
    integer :: ic
    type(cache_list), pointer :: ptr
@@ -102,7 +104,7 @@ subroutine update(self, mol, cache)
    do ic = 1, self%nc
       if (allocated(self%list(ic)%raw)) then
          associate(cont => self%list(ic)%raw)
-            call cont%update(mol, ptr%list(ic))
+            call cont%update(mol, ptr%list(ic), wfn)
          end associate
       end if
    end do

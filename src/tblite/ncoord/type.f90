@@ -55,12 +55,10 @@ module tblite_ncoord_type
    abstract interface
 
       !> Abstract counting function
-      elemental function ncoord_count(self, mol, izp, jzp, r) result(count)
-         import :: ncoord_type, structure_type, wp
+      elemental function ncoord_count(self, izp, jzp, r) result(count)
+         import :: ncoord_type, wp
          !> Instance of coordination number container
          class(ncoord_type), intent(in) :: self
-         !> Molecular structure data
-         type(structure_type), intent(in) :: mol
          !> Atom i index
          integer, intent(in)  :: izp
          !> Atom j index
@@ -72,12 +70,10 @@ module tblite_ncoord_type
       end function ncoord_count
 
       !> Abstract derivative of the counting function w.r.t. the distance.
-      elemental function ncoord_dcount(self, mol, izp, jzp, r) result(count)
-         import :: ncoord_type, structure_type, wp
+      elemental function ncoord_dcount(self, izp, jzp, r) result(count)
+         import :: ncoord_type, wp
          !> Instance of coordination number container
          class(ncoord_type), intent(in) :: self
-         !> Molecular structure data
-         type(structure_type), intent(in) :: mol
          !> Atom i index
          integer, intent(in)  :: izp
          !> Atom j index
@@ -175,7 +171,7 @@ contains
                if (r2 > cutoff2 .or. r2 < 1.0e-12_wp) cycle
                r1 = sqrt(r2)
 
-               countf = self%ncoord_count(mol, izp, jzp, r1)
+               countf = self%ncoord_count(izp, jzp, r1)
 
                cn(iat) = cn(iat) + countf
                if (iat /= jat) then
@@ -227,8 +223,8 @@ contains
                if (r2 > cutoff2 .or. r2 < 1.0e-12_wp) cycle
                r1 = sqrt(r2)
 
-               countf = self%ncoord_count(mol, izp, jzp, r1)
-               countd = self%ncoord_dcount(mol, izp, jzp, r1) * rij/r1
+               countf = self%ncoord_count(izp, jzp, r1)
+               countd = self%ncoord_dcount(izp, jzp, r1) * rij/r1
 
                cn(iat) = cn(iat) + countf
                if (iat /= jat) then

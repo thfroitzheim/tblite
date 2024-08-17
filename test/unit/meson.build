@@ -38,6 +38,7 @@ tests = [
   'fit',
   'gfn1-xtb',
   'gfn2-xtb',
+  'gp3-xtb',
   'ceh',
   'hamiltonian',
   'halogen',

@@ -94,14 +94,16 @@ end subroutine new_onsite_thirdorder
 
 
 !> Update container cache
-subroutine update(self, mol, cache)
+subroutine update(self, mol, cache, wfn)
    !> Instance of the electrostatic container
    class(onsite_thirdorder), intent(in) :: self
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Reusable data container
    type(container_cache), intent(inout) :: cache
-
+   !> Optional auxiliary wavefunction data 
+   type(wavefunction_type), intent(in), optional :: wfn
+   
 end subroutine update
 
 

@@ -550,6 +550,7 @@ subroutine add_basis(calc, mol)
    integer, allocatable :: nsh_id(:)
    integer :: ang_idx(0:2), ortho(max_shell)
    type(cgto_type), allocatable :: cgto(:, :)
+   type(basis_type), allocatable :: tmp
 
    nsh_id = nshell(mol%num)
    allocate(cgto(maxval(nsh_id), mol%nid))
@@ -576,7 +577,9 @@ subroutine add_basis(calc, mol)
       end do
    end do
 
-   call new_basis(calc%bas, mol, nsh_id, cgto, 1.0_wp)
+   allocate(tmp)
+   call new_basis(tmp, mol, nsh_id, cgto, 1.0_wp)
+   call move_alloc(tmp, calc%bas)
 
 end subroutine add_basis
 
@@ -619,10 +622,10 @@ subroutine add_repulsion(calc, mol)
 
    real(wp), allocatable :: alpha(:), zeff(:)
 
-   allocate(calc%repulsion)
    alpha = rep_alpha(mol%num)
    zeff = rep_zeff(mol%num)
-   call new_repulsion(calc%repulsion, mol, alpha, zeff, rep_kexp, rep_kexp, rep_rexp)
+   call new_repulsion(calc%repulsion, mol, rep_type="gfn", zeff=zeff, alpha=alpha, &
+      & rexp=rep_rexp, kexp=rep_kexp, kexp_light=rep_kexp)
 end subroutine add_repulsion
 
 subroutine add_coulomb(calc, mol)
@@ -774,7 +777,7 @@ subroutine get_hscale(self, mol, bas, hscale)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Scaling parameters for the Hamiltonian elements
    real(wp), intent(out) :: hscale(:, :, :, :)
 
@@ -817,7 +820,7 @@ subroutine get_selfenergy(self, mol, bas, selfenergy)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Self energy / atomic levels
    real(wp), intent(out) :: selfenergy(:, :)
 
@@ -841,7 +844,7 @@ subroutine get_cnshift(self, mol, bas, kcn)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Coordination number dependent shift
    real(wp), intent(out) :: kcn(:, :)
 
@@ -864,7 +867,7 @@ subroutine get_shpoly(self, mol, bas, shpoly)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Polynomial parameters for distant dependent scaleing
    real(wp), intent(out) :: shpoly(:, :)
 
@@ -887,7 +890,7 @@ subroutine get_reference_occ(self, mol, bas, refocc)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Reference occupation numbers
    real(wp), intent(out) :: refocc(:, :)
 
@@ -953,8 +956,10 @@ subroutine export_gfn1_param(param)
 
    allocate(param%repulsion)
    associate(par => param%repulsion)
+      par%rep_type = "gfn"
       par%kexp = rep_kexp
       par%klight = rep_kexp
+      par%rexp = rep_rexp
    end associate
 
    allocate(param%charge)

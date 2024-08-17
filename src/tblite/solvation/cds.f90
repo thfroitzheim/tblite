@@ -136,13 +136,15 @@ function create_cds(mol, input) result(self)
 end function create_cds
 
 !> Update cache from container
-subroutine update(self, mol, cache)
+subroutine update(self, mol, cache, wfn)
    !> Instance of the solvation model
    class(cds_solvation), intent(in) :: self
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Reusable data container
    type(container_cache), intent(inout) :: cache
+   !> Optional auxiliary wavefunction data 
+   type(wavefunction_type), intent(in), optional :: wfn
 
    type(cds_cache), pointer :: ptr
    real(wp) :: adet

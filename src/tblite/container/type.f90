@@ -56,13 +56,15 @@ contains
 
 
 !> Update container cache
-subroutine update(self, mol, cache)
+subroutine update(self, mol, cache, wfn)
    !> Instance of the interaction container
    class(container_type), intent(in) :: self
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Cached data between different runs
    type(container_cache), intent(inout) :: cache
+   !> Optional auxiliary wavefunction data 
+   type(wavefunction_type), intent(in), optional :: wfn
 end subroutine update
 
 

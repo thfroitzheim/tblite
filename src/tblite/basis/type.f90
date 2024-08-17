@@ -21,6 +21,7 @@
 module tblite_basis_type
    use mctc_env, only : wp
    use mctc_io, only : structure_type
+   use tblite_ncoord, only : ncoord_type
    implicit none
    private
 
@@ -81,6 +82,10 @@ module tblite_basis_type
       integer, allocatable :: sh2at(:)
       !> Contracted Gaussian basis functions forming the basis set
       class(cgto_type), allocatable :: cgto(:, :)
+      !> Optional Contracted Gaussian basis functions with scaling
+      class(cgto_type), allocatable :: cgto_scaled(:, :)
+      !> Optional coordination number for modifying the contraction coefficients
+      class(ncoord_type), allocatable :: ncoord
    contains
       !> Scales the coefficient of the basis
       procedure :: scale_basis
@@ -94,9 +99,9 @@ module tblite_basis_type
 contains
 
 !> Create a new basis set
-subroutine new_basis(self, mol, nshell, cgto, acc)
+subroutine new_basis(self, mol, nshell, cgto, acc, cgto_scaled)
    !> Instance of the basis set data
-   type(basis_type), intent(out) :: self
+   class(basis_type), intent(out) :: self
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Number of shells per species
@@ -105,12 +110,17 @@ subroutine new_basis(self, mol, nshell, cgto, acc)
    type(cgto_type), intent(in) :: cgto(:, :)
    !> Calculation accuracy
    real(wp), intent(in) :: acc
+   !> Contracted Gaussian basis functions with scaling for each shell and species
+   type(cgto_type), intent(in), optional :: cgto_scaled(:, :)
 
    integer :: iat, isp, ish, iao, ii
    real(wp) :: min_alpha
 
    self%nsh_id = nshell
    self%cgto = cgto
+   if(present(cgto_scaled)) then
+      self%cgto_scaled = cgto_scaled
+   end if
    self%intcut = integral_cutoff(acc)
 
    ! Make count of shells for each atom
@@ -203,12 +213,19 @@ subroutine scale_basis(self, mol, qat, cn, norm, expscal, dqatdr, dqatdL, dcndr,
          do ish = 1, self%nsh_at(iat)
             call self%cgto(ish, iat)%scale_cgto(qat(iat), cn(iat), norm, expscal, &
                & dqatdr(:, :, iat), dqatdL(:, :, iat), dcndr(:, :, iat), dcndL(:, :, iat))
+            if(allocated(self%cgto_scaled)) then
+               call self%cgto_scaled(ish, iat)%scale_cgto(qat(iat), cn(iat), norm, expscal, &
+                  & dqatdr(:, :, iat), dqatdL(:, :, iat), dcndr(:, :, iat), dcndL(:, :, iat))
+            end if   
          end do
       end do
    else 
       do iat = 1, mol%nat
          do ish = 1, self%nsh_at(iat)
             call self%cgto(ish, iat)%scale_cgto(qat(iat), cn(iat), norm, expscal)
+            if(allocated(self%cgto_scaled)) then
+               call self%cgto_scaled(ish, iat)%scale_cgto(qat(iat), cn(iat), norm, expscal)
+            end if
          end do
       end do
    end if
@@ -218,7 +235,7 @@ end subroutine scale_basis
 !> Dummy procedure to scale the contraction coefficients of the CGTOs
 subroutine scale_cgto(self, qat, cn, norm, expscal, dqatdr, dqatdL, dcndr, dcndL)
    !> Instance of the basis set data
-   class(cgto_type(*)), intent(inout) :: self
+   class(cgto_type), intent(inout) :: self
    !> Atomic charges for the charge scaling of the basis set 
    real(wp), intent(in) :: qat
    !> Coordination number

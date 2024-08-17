@@ -80,11 +80,9 @@ subroutine new_gfn_ncoord(self, mol, cutoff, rcov)
 end subroutine new_gfn_ncoord
 
 !> Double-exponential counting function for coordination number contributions.
-elemental function ncoord_count(self, mol, izp, jzp, r) result(count)
+elemental function ncoord_count(self, izp, jzp, r) result(count)
    !> Coordination number container
    class(gfn_ncoord_type), intent(in) :: self
-   !> Molecular structure data (not used in gfn)
-   type(structure_type), intent(in) :: mol
    !> Atom i index
    integer, intent(in)  :: izp
    !> Atom j index
@@ -101,11 +99,9 @@ elemental function ncoord_count(self, mol, izp, jzp, r) result(count)
 end function ncoord_count
 
 !> Derivative of the double-exponential counting function w.r.t. the distance.
-elemental function ncoord_dcount(self, mol, izp, jzp, r) result(count)
+elemental function ncoord_dcount(self, izp, jzp, r) result(count)
    !> Coordination number container
    class(gfn_ncoord_type), intent(in) :: self
-   !> Molecular structure data (not used in gfn)
-   type(structure_type), intent(in) :: mol
    !> Atom i index
    integer, intent(in)  :: izp
    !> Atom j index

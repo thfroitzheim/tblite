@@ -24,7 +24,7 @@ module tblite_xtb_singlepoint
    use mctc_env, only : wp, error_type, fatal_error, get_variable
    use mctc_io, only : structure_type
    use tblite_adjlist, only : adjacency_list, new_adjacency_list
-   use tblite_basis_type, only : get_cutoff, basis_type
+   use tblite_basis_type, only : get_cutoff
    use tblite_blas, only : gemv
    use tblite_container, only : container_cache
    use tblite_context, only : context_type, escape
@@ -69,7 +69,7 @@ contains
 
 !> Entry point for performing single point calculation using the xTB calculator
 subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigma, &
-      & verbosity, results, post_process)
+      & verbosity, results, post_process, wfn_ceh)
    !> Calculation context
    type(context_type), intent(inout) :: ctx
    !> Molecular structure data
@@ -90,7 +90,11 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    integer, intent(in), optional :: verbosity
    !> Container for storing additional results
    type(results_type), intent(out), optional :: results
+   !> Container list for post-processing
    type(post_processing_list), intent(inout), optional :: post_process
+   !> Wavefunction data for the auxiliary CEH calculation
+   type(wavefunction_type), intent(in), optional :: wfn_ceh
+
    
    logical :: grad, converged, econverged, pconverged
    integer :: prlevel
@@ -152,6 +156,14 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    end if
    call get_alpha_beta_occupation(wfn%nocc, wfn%nuhf, wfn%nel(1), wfn%nel(2))
 
+   if (allocated(calc%ncoord)) then
+      allocate(cn(mol%nat))
+      if (grad) then
+         allocate(dcndr(3, mol%nat, mol%nat), dcndL(3, 3, mol%nat))
+      end if
+      call calc%ncoord%get_cn(mol, cn, dcndr, dcndL)
+   end if
+
    if (allocated(calc%halogen)) then
       call timer%push("halogen")
       allocate(hcache)
@@ -166,7 +178,7 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
    if (allocated(calc%repulsion)) then
       call timer%push("repulsion")
       allocate(rcache)
-      call calc%repulsion%update(mol, rcache)
+      call calc%repulsion%update(mol, rcache, wfn_ceh)
       call calc%repulsion%get_engrad(mol, rcache, erep, gradient, sigma)
       if (prlevel > 1) &
          call ctx%message(label_repulsion // format_string(sum(erep), real_format) // " Eh")
@@ -208,14 +220,6 @@ subroutine xtb_singlepoint(ctx, mol, calc, wfn, accuracy, energy, gradient, sigm
       call ctx%message(label_electrons // format_string(wfn%nocc, real_format) // " e")
 
    call timer%push("hamiltonian")
-   if (allocated(calc%ncoord)) then
-      allocate(cn(mol%nat))
-      if (grad) then
-         allocate(dcndr(3, mol%nat, mol%nat), dcndL(3, 3, mol%nat))
-      end if
-      call calc%ncoord%get_cn(mol, cn, dcndr, dcndL)
-   end if
-
    allocate(selfenergy(calc%bas%nsh), dsedcn(calc%bas%nsh))
    call get_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, cn=cn, &
       & selfenergy=selfenergy, dsedcn=dsedcn)

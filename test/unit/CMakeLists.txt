@@ -25,6 +25,7 @@ set(
   "fit"
   "gfn1-xtb"
   "gfn2-xtb"
+  "gp3-xtb"
   "hamiltonian"
   "halogen"
   "integral-overlap"

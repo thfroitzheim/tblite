@@ -263,6 +263,14 @@ subroutine record_from_table(record, table, nsh, allowed, error)
    if (allocated(error)) return
    call read_atom_mask(table, "arep", record%alpha, allowed%repulsion, error)
    if (allocated(error)) return
+   call read_atom_mask(table, "rep_cn", record%rep_cn, allowed%repulsion, error)
+   if (allocated(error)) return
+   call read_atom_mask(table, "rep_q", record%rep_q, allowed%repulsion, error)
+   if (allocated(error)) return
+   call read_atom_mask(table, "rcov_rep", record%rcov_rep, allowed%repulsion, error)
+   if (allocated(error)) return
+   call read_atom_mask(table, "rcov_cn", record%rcov_cn, allowed%repulsion, error)
+   if (allocated(error)) return
 
    call read_atom_mask(table, "xbond", record%xbond, allowed%halogen, error)
    if (allocated(error)) return
@@ -419,6 +427,11 @@ subroutine record_to_table(record, table, error)
 
    call set_value(table, "zeff", record%zeff)
    call set_value(table, "arep", record%alpha)
+   call set_value(table, "rep_cn", record%rep_cn)
+   call set_value(table, "rep_q", record%rep_q)
+   call set_value(table, "rcov_rep", record%rcov_rep)
+   call set_value(table, "rcov_cn", record%rcov_cn)
+   
    call set_value(table, "xbond", record%xbond)
 
    call set_value(table, "dkernel", record%dkernel)

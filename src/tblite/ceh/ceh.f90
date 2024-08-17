@@ -939,6 +939,7 @@ contains
       integer, allocatable :: nsh_id(:)
       integer :: ang_idx(0:3), ortho(max_shell)
       type(cgto_type), allocatable :: cgto(:, :)
+      type(basis_type), allocatable :: tmp
 
       nsh_id = nshell(mol%num)
       allocate(cgto(maxval(nsh_id), mol%nid))
@@ -959,7 +960,9 @@ contains
          end do
       end do
 
-      call new_basis(calc%bas, mol, nsh_id, cgto, 1.0_wp)
+      allocate(tmp)
+      call new_basis(tmp, mol, nsh_id, cgto, 1.0_wp)
+      call move_alloc(tmp, calc%bas)
 
    end subroutine add_ceh_basis
 
@@ -1033,7 +1036,7 @@ contains
       !> Molecular structure data
       type(structure_type), intent(in) :: mol
       !> Basis set information
-      type(basis_type), intent(in) :: bas
+      class(basis_type), intent(in) :: bas
       !> Scaling parameters for the Hamiltonian elements
       real(wp), intent(out) :: hscale(:, :, :, :)
 
@@ -1067,7 +1070,7 @@ contains
       !> Molecular structure data
       type(structure_type), intent(in) :: mol
       !> Basis set information
-      type(basis_type), intent(in) :: bas
+      class(basis_type), intent(in) :: bas
       !> Self energy / atomic levels
       real(wp), intent(out) :: selfenergy(:, :)
 
@@ -1093,7 +1096,7 @@ contains
       !> Molecular structure data
       type(structure_type), intent(in) :: mol
       !> Basis set information
-      type(basis_type), intent(in) :: bas
+      class(basis_type), intent(in) :: bas
       !> Coordination number dependent shift
       real(wp), intent(out) :: kcn(:, :)
 
@@ -1118,7 +1121,7 @@ contains
       !> Molecular structure data
       type(structure_type), intent(in) :: mol
       !> Basis set information
-      type(basis_type), intent(in) :: bas
+      class(basis_type), intent(in) :: bas
       !> Coordination number dependent shift
       real(wp), intent(out) :: kcn_en(:, :)
 
@@ -1142,7 +1145,7 @@ contains
       !> Molecular structure data
       type(structure_type), intent(in) :: mol
       !> Basis set information
-      type(basis_type), intent(in) :: bas
+      class(basis_type), intent(in) :: bas
       !> Reference occupation numbers
       real(wp), intent(out) :: refocc(:, :)
       logical, allocatable  :: valence(:,:)
@@ -1184,7 +1187,7 @@ contains
       !> Molecular structure data
       type(structure_type), intent(in) :: mol
       !> Basis set information
-      type(basis_type), intent(in) :: bas
+      class(basis_type), intent(in) :: bas
       !> Polynomial parameters for distant dependent scaleing
       real(wp), intent(out) :: shpoly(:, :)
 
@@ -1202,7 +1205,7 @@ contains
       !> Molecular structure data
       type(structure_type), intent(in) :: mol
       !> Basis set information
-      type(basis_type), intent(in) :: bas
+      class(basis_type), intent(in) :: bas
       !> Quadratic partial charge dependent shift
       real(wp), intent(out) :: ksig(:, :)
       !> Quadratic partial charge dependent shift

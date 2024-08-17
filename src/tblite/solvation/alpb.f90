@@ -170,13 +170,15 @@ end function create_alpb
 
 
 !> Update cache from container
-subroutine update(self, mol, cache)
+subroutine update(self, mol, cache, wfn)
    !> Instance of the solvation model
    class(alpb_solvation), intent(in) :: self
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Reusable data container
    type(container_cache), intent(inout) :: cache
+   !> Optional auxiliary wavefunction data 
+   type(wavefunction_type), intent(in), optional :: wfn
 
    type(alpb_cache), pointer :: ptr
    real(wp) :: adet

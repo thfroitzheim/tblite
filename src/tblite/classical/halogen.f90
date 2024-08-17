@@ -27,7 +27,7 @@ module tblite_classical_halogen
    use tblite_container, only : container_cache
    use tblite_cutoff, only : get_lattice_points
    use tblite_data_atomicrad, only : get_atomic_rad
-   use tblite_repulsion_type, only : repulsion_type
+   use tblite_classical_type, only : classical_type
    implicit none
    private
 
@@ -35,7 +35,7 @@ module tblite_classical_halogen
 
 
    !> Container for evaluating halogen bonding energy terms by a classical potential
-   type, public, extends(repulsion_type) :: halogen_correction
+   type, public, extends(classical_type) :: halogen_correction
       !> Interaction strength of the halogen bond
       real(wp), allocatable :: bond_strength(:)
       !> Atomic radii of all atoms

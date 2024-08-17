@@ -36,6 +36,7 @@ module tblite_driver_run
    use tblite_wavefunction, only : wavefunction_type, new_wavefunction, &
       & sad_guess, eeq_guess, shell_partition
    use tblite_xtb_calculator, only : xtb_calculator, new_xtb_calculator
+   use tblite_xtb_gp3, only : new_gp3_calculator, export_gp3_param
    use tblite_xtb_gfn2, only : new_gfn2_calculator, export_gfn2_param
    use tblite_xtb_gfn1, only : new_gfn1_calculator, export_gfn1_param
    use tblite_xtb_ipea1, only : new_ipea1_calculator, export_ipea1_param
@@ -73,11 +74,12 @@ subroutine run_main(config, error)
    real(wp) :: energy
    real(wp), allocatable :: dpmom(:), qpmom(:)
    real(wp), allocatable :: gradient(:, :), sigma(:, :)
+   real(wp), allocatable :: cn(:), dcndr(:, :, :), dcndL(:, :, :)
    type(param_record) :: param
    type(context_type) :: ctx
-   type(xtb_calculator) :: calc
-   type(xtb_calculator) :: calc_ceh
-   type(wavefunction_type) :: wfn, wfn_ceh
+   type(xtb_calculator) :: calc, calc_ceh
+   type(wavefunction_type) :: wfn
+   type(wavefunction_type), allocatable :: wfn_ceh
    type(results_type) :: results
    class(post_processing_list), allocatable :: post_proc
 
@@ -141,6 +143,45 @@ subroutine run_main(config, error)
       select case(method)
       case default
          call fatal_error(error, "Unknown method '"//method//"' requested")
+      case("gp3")
+         call new_gp3_calculator(calc, mol, error)
+         ! Setup CEH calculator and wavefunction
+         allocate(wfn_ceh)
+         call new_ceh_calculator(calc_ceh, mol, error)
+         if (allocated(error)) return
+         call new_wavefunction(wfn_ceh, mol%nat, calc_ceh%bas%nsh, calc_ceh%bas%nao, 1,&
+            & config%etemp_guess * kt, config%grad)
+         ! Check if an electric field is present
+         if (allocated(config%efield)) then
+            block
+            class(container_type), allocatable :: cont
+            cont = electric_field(config%efield*vatoau)
+            call calc_ceh%push_back(cont)
+            end block
+         end if
+         ! Perform required CEH calculation
+         call ceh_singlepoint(ctx, calc_ceh, mol, wfn_ceh, config%accuracy, &
+            & config%grad, config%verbosity)
+         if (ctx%failed()) then
+            call fatal(ctx, "CEH singlepoint calculation failed")
+            do while(ctx%failed())
+               call ctx%get_error(error)
+               write(error_unit, '("->", 1x, a)') error%message
+            end do
+            error stop
+         end if
+         ! Calculate the coordination number required for basis set scaling
+         if (allocated(calc%bas%ncoord)) then
+            allocate(cn(mol%nat))
+            if (config%grad) then
+               allocate(dcndr(3, mol%nat, mol%nat), dcndL(3, 3, mol%nat))
+            end if
+            call calc%bas%ncoord%get_cn(mol, cn, dcndr, dcndL)         
+         end if
+         ! Scale the basis set (only for q-vSZP) with its charge and CN dependence
+         call calc%bas%scale_basis(mol, wfn_ceh%qat(:, 1), cn, .true., &
+            & dqatdr=wfn_ceh%dqatdr(:, :, :, 1), dqatdL=wfn_ceh%dqatdL(:, :, :, 1), &
+            & dcndr=dcndr, dcndL=dcndL)
       case("gfn2")
          call new_gfn2_calculator(calc, mol, error)
       case("gfn1")
@@ -155,31 +196,6 @@ subroutine run_main(config, error)
 
    call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, nspin, config%etemp * kt)
 
-   if (config%guess == "ceh") then
-      call new_ceh_calculator(calc_ceh, mol, error)
-      if (allocated(error)) return
-      call new_wavefunction(wfn_ceh, mol%nat, calc_ceh%bas%nsh, calc_ceh%bas%nao, 1, config%etemp_guess * kt)
-      if (config%grad) then
-         call ctx%message("WARNING: CEH gradient not yet implemented. Stopping.")
-         return
-      end if
-   end if
-
-   if (allocated(config%efield)) then
-      block
-         class(container_type), allocatable :: cont
-         cont = electric_field(config%efield*vatoau)
-         call calc%push_back(cont)
-      end block
-         if (config%guess == "ceh") then
-            block
-            class(container_type), allocatable :: cont
-            cont = electric_field(config%efield*vatoau)
-            call calc_ceh%push_back(cont)
-            end block
-         end if
-   end if
-
    select case(config%guess)
    case default
       call fatal_error(error, "Unknown starting guess '"//config%guess//"' requested")
@@ -188,16 +204,39 @@ subroutine run_main(config, error)
    case("eeq")
       call eeq_guess(mol, calc, wfn)
    case("ceh")
-      call ceh_singlepoint(ctx, calc_ceh, mol, wfn_ceh, config%accuracy, config%grad, config%verbosity)
-      if (ctx%failed()) then
-         call fatal(ctx, "CEH singlepoint calculation failed")
-         do while(ctx%failed())
-            call ctx%get_error(error)
-            write(error_unit, '("->", 1x, a)') error%message
-         end do
-         error stop
+      if (.not.allocated(wfn_ceh)) then
+         ! Setup CEH calculator and wavefunction
+         allocate(wfn_ceh)
+         call new_ceh_calculator(calc_ceh, mol, error)
+         if (allocated(error)) return
+         call new_wavefunction(wfn_ceh, mol%nat, calc_ceh%bas%nsh, calc_ceh%bas%nao, 1,&
+            & config%etemp_guess * kt)
+         ! Check if an electric field is present
+         if (allocated(config%efield)) then
+            block
+            class(container_type), allocatable :: cont
+            cont = electric_field(config%efield*vatoau)
+            call calc_ceh%push_back(cont)
+            end block
+         end if
+         ! Perform CEH calculation
+         call ceh_singlepoint(ctx, calc_ceh, mol, wfn_ceh, config%accuracy, .false., config%verbosity)
+         if (ctx%failed()) then
+            call fatal(ctx, "CEH singlepoint calculation failed")
+            do while(ctx%failed())
+               call ctx%get_error(error)
+               write(error_unit, '("->", 1x, a)') error%message
+            end do
+            error stop
+         end if
+         wfn%qat(:, 1) = wfn_ceh%qat(:, 1)
+         ! Remove CEH wavefunction as it is no longer needed
+         ! if CEH is only used as a guess
+         deallocate(wfn_ceh)
+      else
+         ! Keep the CEH wavefunction
+         wfn%qat(:, 1) = wfn_ceh%qat(:, 1)
       end if
-      wfn%qat(:, 1) = wfn_ceh%qat(:, 1)
       call shell_partition(mol, calc, wfn)
    end select
    if (allocated(error)) return
@@ -257,7 +296,7 @@ subroutine run_main(config, error)
    end if
 
    call xtb_singlepoint(ctx, mol, calc, wfn, config%accuracy, energy, gradient, sigma, &
-      & config%verbosity, results, post_proc)
+      & config%verbosity, results, post_proc, wfn_ceh)
    if (ctx%failed()) then
       call fatal(ctx, "Singlepoint calculation failed")
       do while(ctx%failed())

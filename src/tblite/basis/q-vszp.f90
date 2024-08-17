@@ -32,7 +32,7 @@ module tblite_basis_qvszp
    use tblite_basis_type, only : basis_type, integral_cutoff
    use tblite_basis_type, only : cgto_type
    use tblite_integral_overlap, only : overlap_cgto, overlap_grad_decontracted_cgto, msao
-   use tblite_ncoord, only : ncoord_type, new_ncoord
+   use tblite_ncoord, only : new_ncoord
    implicit none
    private
 
@@ -70,8 +70,6 @@ module tblite_basis_qvszp
 
    !> Collection of information regarding the basis set of a system
    type, public, extends(basis_type) :: qvszp_basis_type 
-      !> Coordination number for modifying the self-energies
-      class(ncoord_type), allocatable :: ncoord
    end type qvszp_basis_type
 
 
@@ -243,7 +241,7 @@ module tblite_basis_qvszp
 contains
 
    !> Create a new basis set
-   subroutine new_basis(self, mol, nshell, cgto, acc)
+   subroutine new_basis(self, mol, nshell, cgto, acc, cgto_scaled)
       !> Instance of the basis set data
       type(qvszp_basis_type), intent(out) :: self
       !> Molecular structure data
@@ -254,12 +252,17 @@ contains
       class(qvszp_cgto_type), intent(in) :: cgto(:, :)
       !> Calculation accuracy
       real(wp), intent(in) :: acc
+      !> Contracted Gaussian basis functions with scaling for each shell and species
+      type(qvszp_cgto_type), intent(in), optional :: cgto_scaled(:, :)
 
       integer :: iat, isp, ish, iao, ii
       real(wp) :: min_alpha
 
       self%nsh_id = nshell
       self%cgto = cgto
+      if (present(cgto_scaled)) then
+         self%cgto_scaled = cgto_scaled
+      end if
       self%intcut = integral_cutoff(acc)
 
       ! Make count of shells for each atom
@@ -325,7 +328,12 @@ contains
          do ish = 1, nshell(isp)
             ! Allocate memory for the gradient of the coefficients
             allocate(self%cgto(ish, iat)%dcoeffdr(3, mol%nat, maxg), &
-            & self%cgto(ish, iat)%dcoeffdL(3, 3, maxg), source=0.0_wp)
+               & self%cgto(ish, iat)%dcoeffdL(3, 3, maxg), source=0.0_wp)
+            ! Allocate memory also for the scaled version
+            if (present(cgto_scaled)) then
+               allocate(self%cgto_scaled(ish, iat)%dcoeffdr(3, mol%nat, maxg), &
+                  & self%cgto_scaled(ish, iat)%dcoeffdL(3, 3, maxg), source=0.0_wp)
+            end if
          end do
       end do
 
@@ -385,7 +393,7 @@ contains
             isp = mol%id(iat)
             izp = mol%num(isp)
             do ish = 1, nsh_id(isp)
-               call normalize_cgto(self(ish, iat), mol%nat, .false.)
+               call normalize_cgto(self(ish, iat), .false.)
             end do 
          end do 
       end if
@@ -448,7 +456,7 @@ contains
             self%dcoeffdL(:, :, ipr) = self%coeff1(ipr) * dqeffdL * normalization
          end if
       end do    
-      
+
       ! Optionally scale the exponent 
       if(present(expscal)) then
          do ipr = 1, maxg
@@ -458,20 +466,18 @@ contains
 
       ! Normalize the CGTOs if requested
       if(norm) then
-         call normalize_cgto(self, size(dqatdr, 2), grad)
+         call normalize_cgto(self, grad)
       end if
 
    end subroutine scale_cgto
 
-   subroutine normalize_cgto(self, nat, grad)
+   subroutine normalize_cgto(self, grad)
       !> Instance of the cgto data
       type(qvszp_cgto_type), intent(inout) :: self
-      !> Number of atoms in the molecule
-      integer, intent(in) :: nat
       !> Flag to normalize also the coefficient gradient
       logical, intent(in) :: grad
 
-      integer :: ipr
+      integer :: ipr, nat
       real(wp) :: normalization, r2, vec(3)
       real(wp) :: overlap(msao(max_shell), msao(max_shell))
       real(wp), allocatable :: dnormalization(:, :), doverlap(:, :, :, :)
@@ -482,6 +488,7 @@ contains
 
       ! No screening has to be applied since the gaussians are on the same center
       if(grad) then
+         nat = size(self%dcoeffdr, 2)
          allocate(dnormalization(3, nat), doverlap(3, nat, msao(max_shell), msao(max_shell)), source=0.0_wp)
          ! The single center overlap has a derivative since it is not normalized at this point
          call overlap_grad_decontracted_cgto(nat, self, self, r2, vec, 100.0_wp, overlap, doverlap)

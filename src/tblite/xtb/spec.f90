@@ -64,7 +64,7 @@ module tblite_xtb_spec
          !> Molecular structure data
          type(structure_type), intent(in) :: mol
          !> Basis set information
-         type(basis_type), intent(in) :: bas
+         class(basis_type), intent(in) :: bas
          !> Scaling parameters for the Hamiltonian elements
          real(wp), intent(out) :: hscale(:, :, :, :)
       end subroutine get_hscale
@@ -77,7 +77,7 @@ module tblite_xtb_spec
          !> Molecular structure data
          type(structure_type), intent(in) :: mol
          !> Basis set information
-         type(basis_type), intent(in) :: bas
+         class(basis_type), intent(in) :: bas
          !> Self energy / atomic levels
          real(wp), intent(out) :: selfenergy(:, :)
       end subroutine get_selfenergy
@@ -90,7 +90,7 @@ module tblite_xtb_spec
          !> Molecular structure data
          type(structure_type), intent(in) :: mol
          !> Basis set information
-         type(basis_type), intent(in) :: bas
+         class(basis_type), intent(in) :: bas
          !> Polynomial parameters for distant dependent scaleing
          real(wp), intent(out) :: shpoly(:, :)
       end subroutine get_shpoly
@@ -103,7 +103,7 @@ module tblite_xtb_spec
          !> Molecular structure data
          type(structure_type), intent(in) :: mol
          !> Basis set information
-         type(basis_type), intent(in) :: bas
+         class(basis_type), intent(in) :: bas
          !> Reference occupation numbers
          real(wp), intent(out) :: refocc(:, :)
       end subroutine get_reference_occ
@@ -119,7 +119,7 @@ subroutine get_cnshift(self, mol, bas, kcn)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Coordination number dependent shift
    real(wp), intent(out) :: kcn(:, :)
 
@@ -134,7 +134,7 @@ subroutine get_cnenshift(self, mol, bas, kcn_en)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Coordination number dependent shift
    real(wp), intent(out) :: kcn_en(:, :)
 
@@ -149,7 +149,7 @@ subroutine get_q1shift(self, mol, bas, kq1)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Linear partial charge dependent shift
    real(wp), intent(out) :: kq1(:, :)
 
@@ -164,7 +164,7 @@ subroutine get_q2shift(self, mol, bas, kq2)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Quadratic partial charge dependent shift
    real(wp), intent(out) :: kq2(:, :)
 
@@ -179,7 +179,7 @@ subroutine get_rad(self, mol, bas, rad)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Atomic radii
    real(wp), intent(out) :: rad(:)
 
@@ -194,7 +194,7 @@ subroutine get_diat_scale(self, mol, bas, ksig, kpi, kdel)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Diatomic frame scaling of sigma bonding contribution
    real(wp), intent(out) :: ksig(:, :)
    !> Diatomic frame scaling of pi bonding contribution

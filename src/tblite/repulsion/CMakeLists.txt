@@ -18,7 +18,9 @@ set(dir "${CMAKE_CURRENT_SOURCE_DIR}")
 
 list(
   APPEND srcs
-  "${dir}/effective.f90"
+  "${dir}/cache.f90"
+  "${dir}/gfn.f90"
+  "${dir}/gp3.f90"
   "${dir}/type.f90"
 )
 

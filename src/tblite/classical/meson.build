@@ -15,5 +15,6 @@
 # along with tblite.  If not, see <https://www.gnu.org/licenses/>.
 
 srcs += files(
-  'halogen.f90'
+  'halogen.f90',
+  'type.f90',
 )

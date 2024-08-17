@@ -310,7 +310,7 @@ subroutine test_mask_gfn2(error)
    close(io)
    if (allocated(error)) return
 
-   call check(error, count(mask1), 26)
+   call check(error, count(mask1), 34)
    if (allocated(error)) return
 
    table = toml_table()
@@ -321,7 +321,7 @@ subroutine test_mask_gfn2(error)
    call mask2%load(table, error)
    if (allocated(error)) return
 
-   call check(error, count(mask2), 26)
+   call check(error, count(mask2), 34)
    if (allocated(error)) return
 
    allocate(array(count(mask2)))
@@ -364,7 +364,7 @@ subroutine test_mask_gfn1(error)
    close(io)
    if (allocated(error)) return
 
-   call check(error, count(mask), 28)
+   call check(error, count(mask), 36)
    if (allocated(error)) return
 
    allocate(array(count(mask)))

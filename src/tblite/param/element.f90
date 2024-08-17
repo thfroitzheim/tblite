@@ -41,7 +41,8 @@ module tblite_param_element
    character(len=*), parameter :: k_shells = "shells", k_levels = "levels", &
       & k_shpoly = "shpoly", k_slater = "slater", k_refocc = "refocc", k_ngauss = "ngauss", &
       & k_gam = "gam", k_lgam = "lgam", k_gam3 = "gam3", k_kcn = "kcn", k_zeff = "zeff", &
-      & k_arep = "arep", k_dkernel = "dkernel", k_qkernel = "qkernel", k_mprad = "mprad", &
+      & k_arep = "arep", k_rep_cn = "rep_cn", k_rep_q = "rep_q", k_rcov_rep = "rcov_rep", &
+      & k_rcov_cn = "rcov_cn", k_dkernel = "dkernel", k_qkernel = "qkernel", k_mprad = "mprad", &
       & k_mpvcn = "mpvcn", k_xbond = "xbond", k_en = "en"
 
    !> Representation of the element specific parameters
@@ -53,8 +54,16 @@ module tblite_param_element
 
       !> Effective nuclear charge used in repulsion
       real(wp) :: zeff = 0.0_wp
-      !> Repulsion exponent
+      !> Repulsion damping exponent
       real(wp) :: alpha = 0.0_wp
+      !> Coefficient for CN dependence of repulsion
+      real(wp) :: rep_cn = 0.0_wp
+      !> Coefficient for atomic charge dependence of repulsion
+      real(wp) :: rep_q = 0.0_wp
+      !> Covalent atomic radii for repulsion
+      real(wp) :: rcov_rep = 0.0_wp
+      !> Covalent atomic radii for repulsion CN
+      real(wp) :: rcov_cn = 0.0_wp
 
       !> Halogen bonding strength
       real(wp) :: xbond = 0.0_wp
@@ -120,8 +129,16 @@ module tblite_param_element
 
       !> Effective nuclear charge used in repulsion
       logical :: zeff
-      !> Repulsion exponent
+      !> Repulsion damping exponent
       logical :: alpha
+      !> Coefficient for CN dependence of repulsion
+      logical :: rep_cn
+      !> Coefficient for atomic charge dependence of repulsion
+      logical :: rep_q
+      !> Covalent atomic radii for repulsion
+      logical :: rcov_rep
+      !> Covalent atomic radii for repulsion CN
+      logical :: rcov_cn
 
       !> Halogen bonding strength
       logical :: xbond
@@ -313,6 +330,29 @@ subroutine get_repulsion(self, table, error)
    call get_value(table, k_arep, self%alpha, stat=stat)
    if (stat /= 0) then
       call fatal_error(error, "Invalid repulsion exponent for "//trim(self%sym))
+      return
+   end if
+   call get_value(table, k_rep_cn, self%rep_cn, 0.0_wp, stat=stat)
+   if (stat /= 0) then
+      write(*,*) "We hit an error"
+      call fatal_error(error, "Invalid repulsion CN-dependence for "//trim(self%sym))
+      return
+   end if
+   call get_value(table, k_rep_q, self%rep_q, 0.0_wp, stat=stat)
+   if (stat /= 0) then
+      write(*,*) "We hit an error"
+      call fatal_error(error, "Invalid repulsion charge-dependence for "//trim(self%sym))
+      return
+   end if
+   call get_value(table, k_rcov_rep, self%rcov_rep, 0.0_wp, stat=stat)
+   if (stat /= 0) then
+      write(*,*) "We hit an error"
+      call fatal_error(error, "Invalid covalent radius for repulsion for "//trim(self%sym))
+      return
+   end if
+   call get_value(table, k_rcov_cn, self%rcov_cn, 0.0_wp, stat=stat)
+   if (stat /= 0) then
+      call fatal_error(error, "Invalid covalent radius for repulsion CN for "//trim(self%sym))
       return
    end if
 end subroutine get_repulsion
@@ -594,6 +634,10 @@ subroutine dump_to_toml(self, table, error)
 
    call set_value(table, k_zeff, self%zeff)
    call set_value(table, k_arep, self%alpha)
+   call set_value(table, k_rep_cn, self%rep_cn)
+   call set_value(table, k_rep_q, self%rep_q)
+   call set_value(table, k_rcov_rep, self%rcov_rep)
+   call set_value(table, k_rcov_cn, self%rcov_cn)
    call set_value(table, k_xbond, self%xbond)
    call set_value(table, k_en, self%en)
 
@@ -620,6 +664,10 @@ subroutine load_from_array(self, array, offset, base, mask, error)
 
    call load_atom_par(self%zeff, mask%zeff, array, offset)
    call load_atom_par(self%alpha, mask%alpha, array, offset)
+   call load_atom_par(self%rep_cn, mask%rep_cn, array, offset)
+   call load_atom_par(self%rep_q, mask%rep_q, array, offset)
+   call load_atom_par(self%rcov_rep, mask%rcov_rep, array, offset)
+   call load_atom_par(self%rcov_cn, mask%rcov_cn, array, offset)
 
    call load_atom_par(self%xbond, mask%xbond, array, offset)
 
@@ -647,6 +695,10 @@ subroutine dump_to_array(self, array, offset, mask, error)
 
    call dump_atom_par(self%zeff, mask%zeff, array, offset)
    call dump_atom_par(self%alpha, mask%alpha, array, offset)
+   call dump_atom_par(self%rep_cn, mask%rep_cn, array, offset)
+   call dump_atom_par(self%rep_q, mask%rep_q, array, offset)
+   call dump_atom_par(self%rcov_rep, mask%rcov_rep, array, offset)
+   call dump_atom_par(self%rcov_cn, mask%rcov_cn, array, offset)
 
    call dump_atom_par(self%xbond, mask%xbond, array, offset)
 
@@ -736,6 +788,10 @@ elemental function count_mask(mask) result(ncount)
    ncount = count([ &
       mask%zeff, &
       mask%alpha, &
+      mask%rep_cn, &
+      mask%rep_q, &
+      mask%rcov_rep, &
+      mask%rcov_cn, &
       mask%xbond, &
       mask%levels, &
       mask%slater, &

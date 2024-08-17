@@ -22,6 +22,7 @@ list(
   "${dir}/coulomb.f90"
   "${dir}/gfn1.f90"
   "${dir}/gfn2.f90"
+  "${dir}/gp3.f90"
   "${dir}/h0.f90"
   "${dir}/ipea1.f90"
   "${dir}/singlepoint.f90"

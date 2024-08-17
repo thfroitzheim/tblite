@@ -37,8 +37,7 @@ module tblite_xtb_calculator
       & d3_dispersion, new_d3_dispersion
    use tblite_ncoord, only : ncoord_type, new_ncoord
    use tblite_param, only : param_record
-   use tblite_repulsion, only : new_repulsion
-   use tblite_repulsion_effective, only : tb_repulsion
+   use tblite_repulsion, only : new_repulsion, repulsion_type
    use tblite_xtb_coulomb, only : tb_coulomb
    use tblite_xtb_h0, only : tb_hamiltonian, new_hamiltonian
    use tblite_xtb_spec, only : tb_h0spec
@@ -57,7 +56,7 @@ module tblite_xtb_calculator
    !> Extended tight-binding calculator
    type, public :: xtb_calculator
       !> Basis set definition
-      type(basis_type) :: bas
+      class(basis_type), allocatable :: bas
       !> Core Hamiltonian
       type(tb_hamiltonian) :: h0
       !> Coordination number for modifying the self-energies
@@ -65,7 +64,7 @@ module tblite_xtb_calculator
       !> Electronegativity-weighted coordination number for modifying the self-energies
       class(ncoord_type), allocatable :: ncoord_en
       !> Repulsion energy interactions
-      type(tb_repulsion), allocatable :: repulsion
+      class(repulsion_type), allocatable :: repulsion
       !> Collection of all Coulombic interactions
       type(tb_coulomb), allocatable :: coulomb
       !> Halogen bonding correction
@@ -169,6 +168,7 @@ subroutine add_basis(calc, mol, param, irc)
    integer, allocatable :: nsh_id(:)
    integer :: ang_idx(0:4), ortho(10)
    type(cgto_type), allocatable :: cgto(:, :)
+   type(basis_type), allocatable :: tmp
 
    nsh_id = param%record(irc)%nsh
    allocate(cgto(maxval(nsh_id), mol%nid))
@@ -195,7 +195,9 @@ subroutine add_basis(calc, mol, param, irc)
       end do
    end do
 
-   call new_basis(calc%bas, mol, nsh_id, cgto, 1.0_wp)
+   allocate(tmp)
+   call new_basis(tmp, mol, nsh_id, cgto, 1.0_wp)
+   call move_alloc(tmp, calc%bas)
 
 end subroutine add_basis
 
@@ -263,16 +265,20 @@ subroutine add_repulsion(calc, mol, param, irc)
    !> Record identifiers
    integer, intent(in) :: irc(:)
 
-   real(wp), allocatable :: alpha(:), zeff(:)
-   real(wp), parameter :: rep_rexp = 1.0_wp
+   real(wp), allocatable :: alpha(:), zeff(:), rep_cn(:), rep_q(:), rcov_rep(:), rcov_cn(:)
 
    if (.not.allocated(param%repulsion)) return
-   allocate(calc%repulsion)
-   alpha = param%record(irc)%alpha
-   zeff = param%record(irc)%zeff
-   call new_repulsion(calc%repulsion, mol, alpha, zeff, param%repulsion%kexp, &
-      & param%repulsion%klight, rep_rexp)
 
+   zeff = param%record(irc)%zeff
+   alpha = param%record(irc)%alpha
+   rep_cn = param%record(irc)%rep_cn
+   rep_q = param%record(irc)%rep_q
+   rcov_rep = param%record(irc)%rcov_rep
+   rcov_cn = param%record(irc)%rcov_cn
+   call new_repulsion(calc%repulsion, mol, rep_type=param%repulsion%rep_type, &
+      & zeff=zeff, alpha=alpha, rexp=param%repulsion%rexp, kexp=param%repulsion%kexp, &
+      & kexp_light=param%repulsion%klight, kcn=rep_cn, kq=rep_q, rcov_rep=rcov_rep, &
+      & rcov_cn=rcov_cn, exp_cn=param%repulsion%exp_cn)
 end subroutine add_repulsion
 
 
@@ -464,7 +470,7 @@ subroutine get_hscale(self, mol, bas, hscale)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Scaling parameters for the Hamiltonian elements
    real(wp), intent(out) :: hscale(:, :, :, :)
 
@@ -514,7 +520,7 @@ subroutine get_selfenergy(self, mol, bas, selfenergy)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Self energy / atomic levels
    real(wp), intent(out) :: selfenergy(:, :)
 
@@ -540,7 +546,7 @@ subroutine get_cnshift(self, mol, bas, kcn)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Coordination number dependent shift
    real(wp), intent(out) :: kcn(:, :)
 
@@ -566,7 +572,7 @@ subroutine get_shpoly(self, mol, bas, shpoly)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Polynomial parameters for distant dependent scaleing
    real(wp), intent(out) :: shpoly(:, :)
 
@@ -591,7 +597,7 @@ subroutine get_reference_occ(self, mol, bas, refocc)
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Basis set information
-   type(basis_type), intent(in) :: bas
+   class(basis_type), intent(in) :: bas
    !> Reference occupation numbers
    real(wp), intent(out) :: refocc(:, :)
 

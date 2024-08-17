@@ -186,22 +186,49 @@ Allowed entries:
 
 Repulsion section
 -----------------
+The xTB repulsion term can be specified in either the *gfn* or *gp3* subtable. Only one repulsion term can be active at a time. 
 
-The xTB repulsion term can be specified in the *effective* subtable.
+
+GFN repulsion
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+GFN repulsion is based on a damped Coulomb-type repulsion (*rexp*=1). The *zeff* parameter in the element records is used as the effective nuclear charge, while *arep* is used after geometric averaging in the exponent in the exponential damping function. 
 
 .. code-block:: toml
    :caption: Repulsion for GFN1-xTB
 
    [repulsion]
-   effective = {kexp=1.5}
+   gfn = {kexp=1.5}
 
 Allowed entries:
 
 ========= ================================= =================== =====================
  Keyword   Description                       Type                Unit
 ========= ================================= =================== =====================
- kexp      exponent for repulsion            real                dimensionless
+ kexp      exponent for repulsion damping    real                dimensionless
  klight    exponent for light atom pairs     real                dimensionless
+ rexp      exponent for inverse polynomial   real                dimensionless
+========= ================================= =================== =====================
+
+
+GP3 repulsion
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+GP3 repulsion is based on a damped inverse square repulsion (*rexp*=2). The *zeff* parameter in the element records is used as the base effective nuclear charge, which is modified linearly with the CN (*rep_cn*) and the atomic CEH charge (*rep_q*). The covalent radius in the CN is defined by *rcov_cn* in the element records and the exponent of the CN term is defined by *exp_cn* in the repulsion record. The error-function-based damping uses geometrically averaged exponents in *arep* and the damping radii in *rcov_rep*. 
+
+.. code-block:: toml
+   :caption: Repulsion for GP3-xTB
+
+   [repulsion]
+   gp3 = {kexp=1.5}
+
+Allowed entries:
+
+========= ================================= =================== =====================
+ Keyword   Description                       Type                Unit
+========= ================================= =================== =====================
+ exp_cn    exponent for repulsion CN         real                dimensionless
+ rexp      exponent for inverse polynomial   real                dimensionless
 ========= ================================= =================== =====================
 
 Halogen section
@@ -387,6 +414,10 @@ Allowed entries:
  gam3      atomic Hubbard derivative        real                Hartree/Unitcharge³
  zeff      effective nuclear charge         real                Unitcharge
  arep      repulsion exponent               real                dimensionless
+ rep_cn    linear CN dependence             real                dimensionless
+ rep_q     linear CEH charge dependence     real                1/Unitcharge
+ rcov_rep  damping radius repulsion         real                Bohr
+ rcov_cn   radius repulsion CN              real                Bohr
  dkernel   on-site dipole kernel            real                Hartree
  qkernel   on-site quadrupole kernel        real                Hartree
  mprad     critical multipole radius        real                Bohr

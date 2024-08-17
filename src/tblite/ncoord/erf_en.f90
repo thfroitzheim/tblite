@@ -101,11 +101,9 @@ contains
 
 
    !> Error counting function for coordination number contributions.
-   elemental function ncoord_count(self, mol, izp, jzp, r) result(count)
+   elemental function ncoord_count(self, izp, jzp, r) result(count)
       !> Coordination number container
       class(erf_en_ncoord_type), intent(in) :: self
-      !> Molecular structure data
-      type(structure_type), intent(in) :: mol
       !> Atom i index
       integer, intent(in)  :: izp
       !> Atom j index
@@ -123,11 +121,9 @@ contains
    end function ncoord_count
 
    !> Derivative of the error counting function w.r.t. the distance.
-   elemental function ncoord_dcount(self, mol, izp, jzp, r) result(count)
+   elemental function ncoord_dcount(self, izp, jzp, r) result(count)
       !> Coordination number container
       class(erf_en_ncoord_type), intent(in) :: self
-      !> Molecular structure data
-      type(structure_type), intent(in) :: mol
       !> Atom i index
       integer, intent(in)  :: izp
       !> Atom j index

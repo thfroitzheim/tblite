@@ -84,13 +84,15 @@ end subroutine new_d4_dispersion
 
 
 !> Update dispersion cache
-subroutine update(self, mol, cache)
+subroutine update(self, mol, cache, wfn)
    !> Instance of the dispersion correction
    class(d4_dispersion), intent(in) :: self
    !> Molecular structure data
    type(structure_type), intent(in) :: mol
    !> Cached data between different dispersion runs
    type(container_cache), intent(inout) :: cache
+   !> Optional auxiliary wavefunction data 
+   type(wavefunction_type), intent(in), optional :: wfn
 
    real(wp), allocatable :: lattr(:, :)
    type(dispersion_cache), pointer :: ptr
