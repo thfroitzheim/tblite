@@ -385,7 +385,6 @@ contains
                         !$omp atomic
                         block_overlap(jaosh+jao, iaosh+iao) = block_overlap(jaosh+jao, iaosh+iao) &
                            + stmp(ij)
-
                         block_doverlap(:, jaosh+jao, iaosh+iao) = block_doverlap(:, jaosh+jao, iaosh+iao) &
                            + dstmp(:, ij)
 
@@ -396,14 +395,11 @@ contains
 
                         dh0dr(:, jj+jao, ii+iao) = dh0dr(:, jj+jao, ii+iao) &
                            & + dstmp(:, ij) * vij + stmp(ij) * dvijdr(:, iat)
-                        !$omp atomic
                         dh0dr(:, ii+iao, jj+jao) = dh0dr(:, ii+iao, jj+jao) &
                            & - dstmp(:, ij) * vij - stmp(ij) * dvijdr(:, iat)
 
-                        !$omp atomic
                         dh0dL(:, :, jj+jao, ii+iao) = dh0dL(:, :, jj+jao, ii+iao) &
                            & + stmp(ij) * dvijdL(:, :)
-                        !$omp atomic
                         dh0dL(:, :, ii+iao, jj+jao) = dh0dL(:, :, ii+iao, jj+jao) &
                            & - stmp(ij) * dvijdL(:, :)
 
@@ -459,8 +455,8 @@ contains
          end do
       end do
    
-      !$omp parallel do schedule(runtime) default(none) reduction(+:dh0dr) &
-      !$omp shared(mol, bas, dsedr, pot) &
+      !$omp parallel do schedule(runtime) default(none) reduction(+:dh0dr, dh0dL) &
+      !$omp shared(mol, bas, dsedr, dsedL, pot) &
       !$omp private(iat, izp, jzp, is, ish, ii, iao, dvijdr, dvijdL)
       do iat = 1, mol%nat
          izp = mol%id(iat)

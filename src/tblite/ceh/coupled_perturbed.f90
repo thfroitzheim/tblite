@@ -14,10 +14,7 @@
 ! You should have received a copy of the GNU Lesser General Public License
 ! along with tblite.  If not, see <https://www.gnu.org/licenses/>.
 
-!> @file tblite/ceh/singlepoint.f90
-!> Provides main entry point for performing a CEH calculation
-!> follows in close analogy the xtb singlepoint
-
+!> @file tblite/ceh/coupled_perturbed.f90
 !> Implementation of the coupled-perturbed equations for the
 !> density matrix and Mulliken charge derivatives
 module tblite_ceh_coupled_perturbed
@@ -36,6 +33,7 @@ module tblite_ceh_coupled_perturbed
    & get_mulliken_atomic_multipoles
    use tblite_wavefunction_fermi, only : get_fermi_filling_gradient
    use tblite_blas, only : gemm
+   use tblite_lapack, only : getrf, getrs
    implicit none
    private
 
@@ -68,12 +66,16 @@ contains
       integer :: ic, iao, jao, homo, spin
       real(wp) :: denom, e_fermi
       real(wp), allocatable :: dh0dr_mo(:,:), doverlap_mo(:,:), ddensitydr_mo(:,:), tmp(:,:)
-      real(wp), allocatable :: u_mo(:,:), demo(:)
+      real(wp), allocatable :: u_mo(:,:), demo(:), a(:, :), b(:, :)
       real(wp), allocatable :: focc(:), dfocc(:)
+      integer, allocatable :: ipiv(:)
+      integer :: info
 
       allocate(dh0dr_mo(bas%nao,bas%nao), doverlap_mo(bas%nao,bas%nao), ddensitydr_mo(bas%nao,bas%nao), &
-      & tmp(bas%nao,bas%nao), u_mo(bas%nao,bas%nao), demo(bas%nao), focc(bas%nao), dfocc(bas%nao), &
-      & source = 0.0_wp)
+      & tmp(bas%nao,bas%nao), u_mo(bas%nao,bas%nao), demo(bas%nao), a(bas%nao, bas%nao), b(bas%nao, bas%nao), &
+      & focc(bas%nao), dfocc(bas%nao), source = 0.0_wp)
+
+      allocate(ipiv(bas%nao))
 
       ddensitydr(:, :, :) = 0.0_wp
       ddensitydL(:, :, :, :) = 0.0_wp
@@ -93,63 +95,106 @@ contains
          call gemm(amat=wfn%coeff(:,:,1),bmat=doverlap(ic,:,:),cmat=tmp,transa='T',transb='N')
          call gemm(amat=tmp,bmat=wfn%coeff(:,:,1),cmat=doverlap_mo(:,:),transa='N',transb='N')
 
-         ! Determine the eigen value derivative E^(1)_pp = (F_mo^{1}_pp - S_mo^(1)_pp * E^(0)_pp)
-         do iao = 1, bas%nao
-            demo(iao) = dh0dr_mo(iao,iao) - doverlap_mo(iao,iao) * wfn%emo(iao,1)
-         end do 
+         !write(*,*) "focc", wfn%focc, wfn%nspin
 
-         ! Determine the occupation number derivative based on the Fermi-Smearing
-         call get_fermi_filling_gradient(wfn%nel(1), wfn%kt, wfn%emo(:,1), demo, &
-         & homo, focc, dfocc, e_fermi)
+         do spin = 1, wfn%nspin
+            ! Determine the eigen value derivative E^(1)_pp = ( (F_mo^{1}_pp - S_mo^(1)_pp * E^(0)_pp) ) * n^(0)_p
+            do iao = 1, bas%nao
+               demo(iao) = (dh0dr_mo(iao,iao) - doverlap_mo(iao,iao) * wfn%emo(iao,spin)) * wfn%focc(iao,spin)
+            end do 
 
-         do spin = 1, 2
-            call get_fermi_filling_gradient(wfn%nel(spin), wfn%kt, wfn%emo(:,1), demo, &
+            ! Determine the occupation number derivative based on the Fermi-Smearing
+            call get_fermi_filling_gradient(wfn%nel(spin), wfn%kt, wfn%emo(:,spin), demo, &
             & homo, focc, dfocc, e_fermi)
-            ! + dfocc
-         end do
-
-         ! Determine the unitary transformation matrix derivative from the unperturbed to the perturbed basis matrix
-         do iao = 1, homo
-            do jao = iao+1, homo
-               ! Off-diagonal occ-occ terms: u^(1)_qp = -0.5 S_mo^(1)_qp
-               u_mo(iao,jao) = -0.5_wp * doverlap_mo(iao,jao)
-               !u_mo(jao,iao) = -0.5_wp * doverlap_mo(jao,iao)
-            end do 
-            do jao = homo + 1, bas%nao
-               !denom = wfn%emo(jao,1)-wfn%emo(iao,1)
-               ! occ-virt terms: u^(1)_qp = (F_mo^(1)_qp - S_mo^(1)_qp * E^(0)_pp) / (E^(0)_pp - E^(0)_qq)
-               denom = wfn%emo(iao,1)-wfn%emo(jao,1)
-               u_mo(iao,jao) = u_mo(iao,jao) + (dh0dr_mo(iao,jao) - doverlap_mo(iao,jao) * wfn%emo(iao,1))/denom 
-               u_mo(jao,iao) = u_mo(jao,iao) - (dh0dr_mo(iao,jao) - doverlap_mo(iao,jao) * wfn%emo(iao,1))/denom 
-               !denom = wfn%emo(jao,1)-wfn%emo(iao,1)
-               !u_mo(jao,iao) = u_mo(jao,iao) + (dh0dr_mo(jao,iao) - doverlap_mo(jao,iao) * wfn%emo(jao,1))/denom
-               !u_mo(jao,iao) = (dh0dr_mo(jao,iao) - doverlap_mo(jao,iao) * wfn%emo(iao,1))/denom
-               
-            end do 
-         end do 
-         !call write_2d_matrix(u_mo, "u_mo")
-         do iao = 1, bas%nao
-            ! Diagonal terms: u^(1)_pp = -0.5 S_mo^(1)_pp
-            u_mo(iao,iao) = -0.5_wp * doverlap_mo(iao,iao)
-         end do 
-
-         ! Calculate the first derivative of the density matrix in the MO basis
-         do iao = 1, bas%nao
-            do jao = 1, bas%nao
-               ! Unitary transformation matrix derivative terms: P_mo^(1)_qp = u^(1)_qp*n^(0)_p + n^(0)_q*u^(1)_qp
-               ddensitydr_mo(iao,jao) = ddensitydr_mo(iao,jao) + u_mo(iao,jao)*wfn%focc(jao,1) + wfn%focc(iao,1)*u_mo(iao,jao) !
-            end do
-            ! Occupation number derivative terms: P_mo^(1)_pp = n^(1)_p
-            !ddensitydr_mo(iao,iao) = ddensitydr_mo(iao,iao) + dfocc(iao)
-         end do
          
+            !write(*,*) "dfocc", dfocc
+
+            ! Solve the Coupled Perturbed equations u^(1)_qp as a linear equations of the form: A_pq * u^(1)_qp = B_qp
+            ! A_pq = (n^(0)_q - n^(0)_p) * (E^(0)_pp + E^(0)_qq)
+            ! B_qp = (n^(0)_q * F_mo^(1)_qp - S_mo^(1)_qp * (n^(0)_q - n^(0)_p) * E^(0)_pp)
+            do iao = 1, bas%nao
+               do jao = 1, bas%nao
+                  ! Setup A_pq
+                  a(iao, jao) = (wfn%focc(jao,spin) - wfn%focc(iao,spin)) * (wfn%emo(iao,spin) + wfn%emo(jao,spin))
+                  ! Setup B_qp
+                  b(iao, jao) = wfn%focc(jao,spin) * dh0dr_mo(iao,jao) &
+                     & - doverlap_mo(iao,jao) * (wfn%focc(jao,spin) - wfn%focc(iao,spin)) * wfn%emo(iao,spin)
+               end do 
+            end do 
+
+            !call write_2d_matrix(a, "a")
+            !call write_2d_matrix(b, "b")
+
+            ! LU decomoposition of the A matrix
+            call getrf(a, ipiv, info)
+            if (info == 0) then
+               ! Generate inverse of the A matrix given its LU decomposition
+               call getrs(a, b, ipiv, info) !, trans="t")
+            endif
+
+            !call write_2d_matrix(a, "after")
+            !call write_2d_matrix(b, "solution")
+            
+            ! Determine the unitary transformation matrix derivative
+            u_mo = b
+            ! Find all the non-independent pairs
+            do iao = 1, bas%nao
+               do jao = 1, bas%nao 
+                  !write(*,*) "cut", (wfn%focc(jao,spin) - wfn%focc(iao,spin)) * (wfn%emo(iao,spin) + wfn%emo(jao,spin))
+                  if((wfn%focc(jao,spin) - wfn%focc(iao,spin)) * (wfn%emo(iao,spin) + wfn%emo(jao,spin)) == 0.0_wp) then 
+                     !write(*,*) "non-independent pair", iao, jao
+                     u_mo(iao, jao) = -0.5_wp * doverlap_mo(iao, jao)
+                  end if
+               end do 
+            end do 
+
+            !call write_2d_matrix(u_mo, "u_mo")
+
+            ! ! Determine the unitary transformation matrix derivative from the unperturbed to the perturbed basis matrix
+            ! do iao = 1, homo
+            !    do jao = iao+1, homo
+            !       ! Off-diagonal occ-occ terms: u^(1)_qp = -0.5 S_mo^(1)_qp
+            !       u_mo(iao,jao) = -0.5_wp * doverlap_mo(iao,jao)
+            !       !u_mo(jao,iao) = -0.5_wp * doverlap_mo(jao,iao)
+            !    end do 
+            !    do jao = homo + 1, bas%nao
+            !       !denom = wfn%emo(jao,1)-wfn%emo(iao,1)
+            !       ! occ-virt terms: u^(1)_qp = (F_mo^(1)_qp - S_mo^(1)_qp * E^(0)_pp) / (E^(0)_pp - E^(0)_qq)
+            !       denom = wfn%emo(iao,1)-wfn%emo(jao,1)
+            !       u_mo(iao,jao) = u_mo(iao,jao) + (dh0dr_mo(iao,jao) - doverlap_mo(iao,jao) * wfn%emo(iao,1))/denom 
+            !       u_mo(jao,iao) = u_mo(jao,iao) - (dh0dr_mo(iao,jao) - doverlap_mo(iao,jao) * wfn%emo(iao,1))/denom 
+            !       !denom = wfn%emo(jao,1)-wfn%emo(iao,1)
+            !       !u_mo(jao,iao) = u_mo(jao,iao) + (dh0dr_mo(jao,iao) - doverlap_mo(jao,iao) * wfn%emo(jao,1))/denom
+            !       !u_mo(jao,iao) = (dh0dr_mo(jao,iao) - doverlap_mo(jao,iao) * wfn%emo(iao,1))/denom
+
+            !    end do 
+            ! end do 
+            ! !call write_2d_matrix(u_mo, "u_mo")
+            ! do iao = 1, bas%nao
+            !    ! Diagonal terms: u^(1)_pp = -0.5 S_mo^(1)_pp
+            !    u_mo(iao,iao) = -0.5_wp * doverlap_mo(iao,iao)
+            ! end do 
+
+            ! Calculate the first derivative of the density matrix in the MO basis
+            do iao = 1, bas%nao
+               do jao = 1, bas%nao
+                  ! Unitary transformation matrix derivative terms: P_mo^(1)_qp = u^(1)_qp*n^(0)_p + n^(0)_q*u^(1)_qp
+                  ddensitydr_mo(iao,jao) = ddensitydr_mo(iao,jao) &
+                     & + u_mo(iao,jao) + u_mo(jao,iao) !*wfn%focc(jao,spin) + wfn%focc(iao,spin)*
+               end do
+               ! Occupation number derivative terms: P_mo^(1)_pp = n^(1)_p
+               ddensitydr_mo(iao,iao) = ddensitydr_mo(iao,iao) + dfocc(iao)
+            end do
+         
+         end do
+
          ! Transform the first derivative of the density matrix back to the AO basis: P^(1) = C x P_mo^(1) x C^T
          call gemm(amat=wfn%coeff(:,:,1),bmat=ddensitydr_mo(:,:),cmat=tmp,transa='N',transb='N')
          call gemm(amat=tmp,bmat=wfn%coeff(:,:,1),cmat=ddensitydr(ic,:,:),transa='N',transb='T')
 
       end do
 
-    end subroutine get_density_matrix_gradient
+   end subroutine get_density_matrix_gradient
 
 
   subroutine write_2d_matrix(matrix, name, unit, step)

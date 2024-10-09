@@ -91,46 +91,47 @@ subroutine get_mulliken_atomic_charges_gradient(bas, mol, smat, pmat, dsmat, dpm
    ! + ! + ! $omp shared(bas, pmat, smat) private(spin, iao, jao, pao)
    do spin = 1, size(pmat, 3)
       do ic = 1, 3
-         ! write(*,*) "doing dimension", ic
-         ! call write_2d_matrix(smat, "smat")
-         ! call write_2d_matrix(pmat(:, :, 1), "pmat")      
-         ! call write_2d_matrix(dsmat(ic,:,:), "dsmat")
-         ! call write_2d_matrix(dpmatdr(ic,:,:,1), "dpmat")
-         ! tmp = 0.0_wp
-         ! tmp1 = 0.0_wp
-
-         ! tmp1 = smat * dpmatdr(ic,:,:,1)
-         ! call write_2d_matrix(tmp1, "s*dp")
-         ! tmp1 = 0.0_wp
-
-         ! tmp1 = dsmat(ic,:,:) * pmat(:,:,1)
-         ! call write_2d_matrix(tmp1, "ds*p")
+         write(*,*) "doing dimension", ic
+         call write_2d_matrix(smat, "smat")
+         call write_2d_matrix(pmat(:, :, 1), "pmat")      
+         call write_2d_matrix(dsmat(ic,:,:), "dsmat")
+         call write_2d_matrix(dpmatdr(ic,:,:,1), "dpmat")
 
          tmp1 = 0.0_wp
-
-         tmp1 = smat * dpmatdr(ic,:,:,1) + dsmat(ic,:,:) * pmat(:,:,1) 
-         !call write_2d_matrix(tmp1, "s*dp + ds*p")
-
+         !tmp1 = matmul(smat, dpmatdr(ic,:,:,1)) + matmul(dsmat(ic,:,:), pmat(:,:,1))
+         
          do iao = 1, bas%nao
-            iat = bas%ao2at(iao)
-            dpao = 0.0_wp
-            do jao = 1, bas%nao
-               jat = bas%ao2at(jao)
-               dqatdr(ic,iat,jat,spin) = dqatdr(ic,iat,jat,spin) - tmp1(iao, jao)
-               !write(*,*) iat, jat, -tmp1(iao, jao)
-
-            end do 
-            do jat = 1, mol%nat
-               do kao = 1, bas%nao
-                  kat = bas%ao2at(kao)
-
-                  if (jat /= kat .and. kat /= iat ) then
-                     !write(*,*) iat, jat, kat, tmp1(iao, kao)
-                     dqatdr(ic,iat,jat,spin) = dqatdr(ic,iat,jat,spin) + tmp1(iao, kao)
-                  end if
-               end do 
+            do jao = 1, bas%nao 
+               tmp1(jao,iao) = smat(jao,iao) * dpmatdr(ic,jao,iao,1) &
+                  & + dsmat(ic,jao,iao) * pmat(jao,iao,1)
             end do 
          end do
+         !call write_2d_matrix(tmp1, "s*dp + ds*p")
+         ! call write_2d_matrix(smat * dpmatdr(ic,:,:,1), "s*dp")
+         ! call write_2d_matrix(dsmat(ic,:,:) * pmat(:,:,1), "ds*p")
+         call write_2d_matrix(tmp1, "tmp1")
+
+         do iat = 1, mol%nat !iao = 1, bas%nao !mol%nat
+            !iat = bas%ao2at(iao)
+            
+            do jao = 1, bas%nao !bas%nao
+               jat = bas%ao2at(jao)
+               dpao = 0.0_wp
+               write(*,*) "for", iat, jat
+               do kao = 1, bas%nao
+                  write(*,*) jao, kao, tmp1(kao, jao)
+                  dpao = dpao - tmp1(kao, jao)
+               end do 
+               write(*,*) "dpao", dpao
+               dqatdr(ic,jat,iat,spin) = dqatdr(ic,jat,iat,spin) + dpao !- tmp1(iao, jao)
+               !write(*,*) iat, jat, -tmp1(iao, jao)
+               !if(iat /= jat) then
+               !   dqatdr(ic,jat,iat,spin) = dqatdr(ic,jat,iat,spin) - dpao !- tmp1(iao, jao)
+               !end if
+
+            end do 
+         end do
+         call write_2d_matrix(dqatdr(ic,:,:,1), "dqatdr")
 
       end do
    end do

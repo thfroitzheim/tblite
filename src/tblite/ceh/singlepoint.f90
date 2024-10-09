@@ -241,8 +241,8 @@ contains
          & wfn%ddensitydr(:, :, :, 1), wfn%ddensitydL(:, :, :, :, 1))
 
          ! Derivative of the CEH Mulliken charges
-         call get_mulliken_atomic_charges_gradient(calc%bas, mol, ints%overlap, wfn%density, &
-         & doverlap, wfn%ddensitydr, wfn%ddensitydL, wfn%dqatdr, wfn%dqatdL)
+         !call get_mulliken_atomic_charges_gradient(calc%bas, mol, ints%overlap, wfn%density, &
+         !& doverlap, wfn%ddensitydr, wfn%ddensitydL, wfn%dqatdr, wfn%dqatdL)
 
          call timer%pop
       end if 
