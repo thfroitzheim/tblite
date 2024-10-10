@@ -72,8 +72,6 @@ module tblite_coulomb_multipole
       procedure :: get_energy
       !> Get anisotropic electrostatic potential
       procedure :: get_potential
-      !> Get anisotropic electrostatic potential gradient
-      procedure :: get_potential_gradient
       !> Get derivatives of anisotropic electrostatics
       procedure :: get_gradient
    end type damped_multipole
