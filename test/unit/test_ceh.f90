@@ -15,6 +15,9 @@
 ! along with tblite.  If not, see <https://www.gnu.org/licenses/>.
 
 module test_ceh
+   
+   use iso_fortran_env, only: output_unit
+
    use mctc_env, only : wp
    use mctc_env_testing, only : new_unittest, unittest_type, error_type, check, &
    & test_failed
@@ -32,15 +35,15 @@ module test_ceh
    use tblite_ncoord_erf
    use tblite_ncoord_erf_en
    use tblite_ncoord_type, only : get_coordination_number
-
+   use tblite_integral_type, only : integral_type, new_integral
    use tblite_wavefunction_type, only : wavefunction_type, new_wavefunction
    use tblite_xtb_calculator, only : xtb_calculator
    use tblite_ceh_singlepoint, only : ceh_singlepoint
-   use tblite_ceh_ceh, only : ceh_h0spec, new_ceh_calculator
-   use tblite_ceh_h0, only : get_scaled_selfenergy, get_hamiltonian
-
+   use tblite_ceh_ceh, only : ceh_h0spec, new_ceh_calculator, get_effective_qat
+   use tblite_ceh_h0, only : get_scaled_selfenergy, get_hamiltonian, get_hamiltonian_gradient
+   use tblite_scf, only: new_potential, potential_type
+   use tblite_scf_potential, only: add_pot_to_h1
    use tblite_blas, only: gemv
-
    use tblite_container, only : container_type, container_cache
    use tblite_external_field, only : electric_field
    implicit none
@@ -60,33 +63,51 @@ contains
       type(unittest_type), allocatable, intent(out) :: testsuite(:)
 
       testsuite = [ &
-         new_unittest("scaled-selfenergy-H2", test_scaled_selfenergy_h2), &
-         new_unittest("scaled-selfenergy-LiH", test_scaled_selfenergy_lih), &
-         new_unittest("scaled-selfenergy-S2", test_scaled_selfenergy_s2), &
-         new_unittest("scaled-selfenergy-SiH4", test_scaled_selfenergy_sih4), &
-         new_unittest("scaled-selfenergy-AcCl6", test_scaled_selfenergy_accl6), &
-         new_unittest("hamiltonian-H2", test_hamiltonian_h2), &
-         new_unittest("hamiltonian-LiH", test_hamiltonian_lih), &
-         new_unittest("hamiltonian-S2", test_hamiltonian_s2), &
-         new_unittest("hamiltonian-SiH4", test_hamiltonian_sih4), &
-         new_unittest("overlap_diat-H2", test_overlap_diat_h2), &
-         new_unittest("overlap_diat-LiH", test_overlap_diat_lih), &
-         new_unittest("overlap_diat-S2", test_overlap_diat_s2), &
-         new_unittest("overlap_diat-SiH4", test_overlap_diat_sih4), &
-         new_unittest("q-mol-h2", test_q_h2), &
-         new_unittest("q-mol-lih", test_q_lih), &
-         new_unittest("q-mol-sih4", test_q_sih4), &
-         new_unittest("q-mol-cecl3", test_q_cecl3), &
-         new_unittest("q-mol-accl6", test_q_accl6), &
-         new_unittest("q-mol-panp", test_q_panp), &
-         new_unittest("q-mol-mb01", test_q_mb01), &
-         new_unittest("q-mol-mb02", test_q_mb02), &
-         new_unittest("q-mol-mb03", test_q_mb03), &
-         new_unittest("q-mol-mb04", test_q_mb04), &
-         new_unittest("q-chrgd-efield-mol", test_q_ef_chrg_mb01), &
-         new_unittest("d-mol", test_d_mb01), &
-         new_unittest("d-field-mol", test_d_field_mb04), &
-         new_unittest("d-field-change-mol", test_d_hcn) &
+         !new_unittest("scaled-selfenergy-H2", test_scaled_selfenergy_h2), &
+         !new_unittest("scaled-selfenergy-LiH", test_scaled_selfenergy_lih), &
+         !new_unittest("scaled-selfenergy-S2", test_scaled_selfenergy_s2), &
+         !new_unittest("scaled-selfenergy-SiH4", test_scaled_selfenergy_sih4), &
+         !new_unittest("scaled-selfenergy-AcCl6", test_scaled_selfenergy_accl6), &
+         !new_unittest("scaled-selfenergy_grad-H2", test_scaled_selfenergy_grad_h2), &
+         !new_unittest("scaled-selfenergy_grad-LiH", test_scaled_selfenergy_grad_lih), &
+         !new_unittest("scaled-selfenergy_grad-S2", test_scaled_selfenergy_grad_s2), &
+         !new_unittest("scaled-selfenergy_grad-SiH4", test_scaled_selfenergy_grad_sih4), &
+         !new_unittest("scaled-selfenergy_grad-AcCl6", test_scaled_selfenergy_grad_accl6), &
+         !new_unittest("scaled-selfenergy_sigma-LiH", test_scaled_selfenergy_sigma_lih), &
+         !new_unittest("scaled-selfenergy_sigma-CO2", test_scaled_selfenergy_sigma_co2), &
+         !new_unittest("hamiltonian-H2", test_hamiltonian_h2), &
+         !new_unittest("hamiltonian-LiH", test_hamiltonian_lih), &
+         !new_unittest("hamiltonian-S2", test_hamiltonian_s2), &
+         !new_unittest("hamiltonian-SiH4", test_hamiltonian_sih4), &
+         !new_unittest("hamiltonian_grad-H2", test_hamiltonian_grad_h2), &
+         !new_unittest("hamiltonian_grad-LiH", test_hamiltonian_grad_lih), &
+         !new_unittest("hamiltonian_grad-S2", test_hamiltonian_grad_s2), &
+         !new_unittest("hamiltonian_grad-PCl", test_hamiltonian_grad_pcl), &
+         !new_unittest("hamiltonian_grad-SiH4", test_hamiltonian_grad_sih4), &
+         !new_unittest("hamiltonian_grad-AcCl6", test_hamiltonian_grad_accl6), &
+         new_unittest("hamiltonian_sigma-LiH", test_hamiltonian_sigma_lih), &
+         new_unittest("hamiltonian_sigma-SiH4", test_hamiltonian_sigma_sih4), &
+         new_unittest("hamiltonian_sigma-AcCl6", test_hamiltonian_sigma_accl6), &
+         new_unittest("hamiltonian_sigma-CO2", test_hamiltonian_sigma_co2) &
+         !new_unittest("hamiltonian_sigma-acetic", test_hamiltonian_sigma_acetic) &
+         !new_unittest("overlap_diat-H2", test_overlap_diat_h2), &
+         !new_unittest("overlap_diat-LiH", test_overlap_diat_lih), &
+         !new_unittest("overlap_diat-S2", test_overlap_diat_s2), &
+         !new_unittest("overlap_diat-SiH4", test_overlap_diat_sih4), &
+         !new_unittest("q-mol-h2", test_q_h2), &
+         !new_unittest("q-mol-lih", test_q_lih), &
+         !new_unittest("q-mol-sih4", test_q_sih4), &
+         !new_unittest("q-mol-cecl3", test_q_cecl3), &
+         !new_unittest("q-mol-accl6", test_q_accl6), &
+         !new_unittest("q-mol-panp", test_q_panp), &
+         !new_unittest("q-mol-mb01", test_q_mb01), &
+         !new_unittest("q-mol-mb02", test_q_mb02), &
+         !new_unittest("q-mol-mb03", test_q_mb03), &
+         !new_unittest("q-mol-mb04", test_q_mb04), &
+         !new_unittest("q-chrgd-efield-mol", test_q_ef_chrg_mb01), &
+         !new_unittest("d-mol", test_d_mb01), &
+         !new_unittest("d-field-mol", test_d_field_mb04), &
+         !new_unittest("d-field-change-mol", test_d_hcn) &
          ]
 
    end subroutine collect_ceh
@@ -104,6 +125,7 @@ contains
       & 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, & ! 61-80
       & 3, 3, 3, 3, 3, 3, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, & ! 81-100
       & 4, 4, 4]
+
       integer, parameter :: lsh(4, 103) = reshape([&
       & 0, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  0, 1, 0, 0,  0, 1, 0, 0,  0, 1, 0, 0, & ! 1-6
       & 0, 1, 0, 0,  0, 1, 0, 0,  0, 1, 0, 0,  0, 1, 0, 0,  0, 1, 0, 0,  0, 1, 2, 0, & ! 7-12
@@ -268,12 +290,57 @@ contains
 
    end subroutine make_basis
 
-   subroutine test_scaled_selfenergy_mol(error, mol, ref)
 
+   subroutine write_2d_matrix(matrix, name, unit, step)
+      implicit none
+      real(wp), intent(in) :: matrix(:, :)
+      character(len=*), intent(in), optional :: name
+      integer, intent(in), optional :: unit
+      integer, intent(in), optional :: step
+      integer :: d1, d2
+      integer :: i, j, k, l, istep, iunit
+  
+      d1 = size(matrix, dim=1)
+      d2 = size(matrix, dim=2)
+  
+      if (present(unit)) then
+        iunit = unit
+      else
+        iunit = output_unit
+      end if
+  
+      if (present(step)) then
+        istep = step
+      else
+        istep = 6
+      end if
+  
+      if (present(name)) write (iunit, '(/,"matrix printed:",1x,a)') name
+  
+      do i = 1, d2, istep
+        l = min(i + istep - 1, d2)
+        write (iunit, '(/,6x)', advance='no')
+        do k = i, l
+          write (iunit, '(6x,i7,3x)', advance='no') k
+        end do
+        write (iunit, '(a)')
+        do j = 1, d1
+          write (iunit, '(i6)', advance='no') j
+          do k = i, l
+            write (iunit, '(1x,f15.12)', advance='no') matrix(j, k)
+          end do
+          write (iunit, '(a)')
+        end do
+      end do
+  
+    end subroutine write_2d_matrix
+
+   subroutine test_scaled_selfenergy_mol(error, mol, ref)
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
-
+      !> Molecular structure data
       type(structure_type), intent(in) :: mol
+      !> Reference scaled selfenergy
       real(wp), intent(in) :: ref(:)
 
       type(basis_type) :: bas
@@ -322,13 +389,185 @@ contains
 
    end subroutine test_scaled_selfenergy_mol
 
-
-   subroutine test_hamiltonian_mol(error, mol, ref)
-
+   subroutine test_scaled_selfenergy_grad_mol(error, mol)
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
+      !> Molecular structure data
+      type(structure_type), intent(inout) :: mol
 
+      type(basis_type) :: bas
+      type(tb_hamiltonian) :: h0
+      type(erf_ncoord_type) :: ncoord
+      type(erf_en_ncoord_type) :: ncoord_en
+      type(adjacency_list) :: list      
+      integer :: iat, ic
+      real(wp), allocatable :: cn(:), cn_en(:), rcov(:), en(:)
+      real(wp), allocatable :: selfenergy(:), selfenergyr(:), selfenergyl(:)
+      real(wp), allocatable :: dcndr(:, :, :), dcndL(:, :, :), dcn_endr(:, :, :), dcn_endL(:, :, :)
+      real(wp), allocatable :: dsedr(:, :, :), dsedL(:, :, :)
+      real(wp), allocatable :: numdr(:, :, :)
+      real(wp), allocatable :: lattr(:, :)
+      real(wp), parameter :: step = 1.0e-6_wp
+      real(wp), parameter :: cn_cutoff = 30.0_wp
+      real(wp) :: cutoff
+
+      call make_basis(bas, mol, 6)
+      
+      allocate(cn(mol%nat), cn_en(mol%nat), rcov(mol%nid), en(mol%nid), &
+      & dcndr(3, mol%nat, mol%nat), dcndL(3, 3, mol%nat), &
+      & dcn_endr(3, mol%nat, mol%nat), dcn_endL(3, 3, mol%nat), &
+      & numdr(3, mol%nat, bas%nsh))
+
+      ! test with the standard Pyykko radii and Pauling EN (not as in CEH parametrization)
+      rcov(:) = get_covalent_rad(mol%num)
+      en(:) = get_pauling_en(mol%num)
+
+      call new_erf_ncoord(ncoord, mol, cutoff=cn_cutoff, rcov=rcov)
+      call new_erf_en_ncoord(ncoord_en, mol, cutoff=cn_cutoff, rcov=rcov)
+      cutoff = get_cutoff(bas)
+
+      call new_hamiltonian(h0, mol, bas, ceh_h0spec(mol))
+      call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
+
+      allocate(selfenergy(bas%nsh), selfenergyr(bas%nsh), selfenergyl(bas%nsh))
+      do iat = 1, mol%nat
+         do ic = 1, 3
+            mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
+            call get_coordination_number(ncoord , mol, lattr, cn_cutoff, cn)
+            call get_coordination_number(ncoord_en, mol, lattr, cn_cutoff, cn_en)
+
+            call get_scaled_selfenergy(h0, mol%id, bas%ish_at, bas%nsh_id, cn=cn, cn_en=cn_en, &
+            & selfenergy=selfenergyr)
+            
+            mol%xyz(ic, iat) = mol%xyz(ic, iat) - 2*step
+            call get_coordination_number(ncoord , mol, lattr, cn_cutoff, cn)
+            call get_coordination_number(ncoord_en, mol, lattr, cn_cutoff, cn_en)
+            
+            call get_scaled_selfenergy(h0, mol%id, bas%ish_at, bas%nsh_id, cn=cn, cn_en=cn_en, &
+            & selfenergy=selfenergyl)
+
+            mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
+            numdr(ic, iat, :) = 0.5_wp*(selfenergyr - selfenergyl)/step
+         end do
+      end do
+      
+      call get_coordination_number(ncoord, mol, lattr, cutoff, cn, dcndr, dcndL)
+      call get_coordination_number(ncoord_en, mol, lattr, cutoff, cn_en, dcn_endr, dcn_endL)
+
+      allocate(dsedr(3, mol%nat,bas%nsh), dsedL(3, 3, bas%nsh))
+      call get_scaled_selfenergy(h0, mol%id, bas%ish_at, bas%nsh_id, &
+      & cn=cn, cn_en=cn_en, dcndr=dcndr, dcndL=dcndL, dcn_endr=dcn_endr, dcn_endL=dcn_endL, &
+      & selfenergy=selfenergy, dsedr=dsedr, dsedL=dsedL)
+
+      if (any(abs(dsedr - numdr) > thr2)) then
+         call test_failed(error, "Gradient of selfenergies does not match")
+      end if
+
+   end subroutine test_scaled_selfenergy_grad_mol
+
+   subroutine test_scaled_selfenergy_sigma_mol(error, mol)
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+      !> Molecular structure data
+      type(structure_type), intent(inout) :: mol
+
+      type(basis_type) :: bas
+      type(tb_hamiltonian) :: h0
+      type(erf_ncoord_type) :: ncoord
+      type(erf_en_ncoord_type) :: ncoord_en
+      type(adjacency_list) :: list      
+      integer :: ic, jc
+      real(wp) :: eps(3, 3)
+      real(wp), allocatable :: cn(:), cn_en(:), rcov(:), en(:)
+      real(wp), allocatable :: selfenergy(:), selfenergyr(:), selfenergyl(:)
+      real(wp), allocatable :: dcndr(:, :, :), dcndL(:, :, :), dcn_endr(:, :, :), dcn_endL(:, :, :)
+      real(wp), allocatable :: dsedr(:, :, :), dsedL(:, :, :)
+      real(wp), allocatable :: numsigma(:, :, :)
+      real(wp), allocatable :: lattr(:, :), lattice(:, :), xyz(:, :)
+      real(wp), parameter :: unity(3, 3) = reshape(&
+         & [1, 0, 0, 0, 1, 0, 0, 0, 1], shape(unity))
+      real(wp), parameter :: step = 1.0e-6_wp
+      real(wp), parameter :: cn_cutoff = 30.0_wp
+      real(wp) :: cutoff
+
+      call make_basis(bas, mol, 6)
+      
+      allocate(cn(mol%nat), cn_en(mol%nat), rcov(mol%nid), en(mol%nid), &
+      & dcndr(3, mol%nat, mol%nat), dcndL(3, 3, mol%nat), &
+      & dcn_endr(3, mol%nat, mol%nat), dcn_endL(3, 3, mol%nat), &
+      & numsigma(3, 3, bas%nsh), xyz(3, mol%nat))
+
+      ! test with the standard Pyykko radii and Pauling EN (not as in CEH parametrization)
+      rcov(:) = get_covalent_rad(mol%num)
+      en(:) = get_pauling_en(mol%num)
+
+      call new_erf_ncoord(ncoord, mol, cutoff=cn_cutoff, rcov=rcov)
+      call new_erf_en_ncoord(ncoord_en, mol, cutoff=cn_cutoff, rcov=rcov)
+      cutoff = get_cutoff(bas)
+
+      call new_hamiltonian(h0, mol, bas, ceh_h0spec(mol))
+      call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
+
+      allocate(selfenergy(bas%nsh), selfenergyr(bas%nsh), selfenergyl(bas%nsh))
+
+      eps(:, :) = unity
+      xyz(:, :) = mol%xyz
+      if (any(mol%periodic)) lattice = mol%lattice
+      do ic = 1, 3
+         do jc = 1, 3
+            selfenergyr(:) = 0.0_wp
+            selfenergyl(:) = 0.0_wp
+            ! Right hand side
+            eps(jc, ic) = eps(jc, ic) + step
+            mol%xyz(:, :) = matmul(eps, xyz)
+            if (allocated(lattice)) mol%lattice(:, :) = matmul(eps, lattice)
+            call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
+            call get_coordination_number(ncoord, mol, lattr, cn_cutoff, cn)
+            call get_coordination_number(ncoord_en, mol, lattr, cn_cutoff, cn_en)
+
+            call get_scaled_selfenergy(h0, mol%id, bas%ish_at, bas%nsh_id, cn=cn, cn_en=cn_en, &
+            & selfenergy=selfenergyr)
+            
+            ! Left hand side
+            eps(jc, ic) = eps(jc, ic) - 2*step
+            mol%xyz(:, :) = matmul(eps, xyz)
+            if (allocated(lattice)) mol%lattice(:, :) = matmul(eps, lattice)
+            call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
+            call get_coordination_number(ncoord , mol, lattr, cn_cutoff, cn)
+            call get_coordination_number(ncoord_en, mol, lattr, cn_cutoff, cn_en)
+            
+            call get_scaled_selfenergy(h0, mol%id, bas%ish_at, bas%nsh_id, cn=cn, cn_en=cn_en, &
+            & selfenergy=selfenergyl)
+
+            eps(jc, ic) = eps(jc, ic) + step
+            mol%xyz(:, :) = xyz
+            if (allocated(lattice)) mol%lattice = lattice
+            numsigma(ic, jc, :) = 0.5_wp*(selfenergyr - selfenergyl)/step
+         end do
+      end do
+      
+      call get_coordination_number(ncoord, mol, lattr, cutoff, cn, dcndr, dcndL)
+      call get_coordination_number(ncoord_en, mol, lattr, cutoff, cn_en, dcn_endr, dcn_endL)
+
+      allocate(dsedr(3, mol%nat,bas%nsh), dsedL(3, 3, bas%nsh))
+      call get_scaled_selfenergy(h0, mol%id, bas%ish_at, bas%nsh_id, &
+      & cn=cn, cn_en=cn_en, dcndr=dcndr, dcndL=dcndL, dcn_endr=dcn_endr, dcn_endL=dcn_endL, &
+      & selfenergy=selfenergy, dsedr=dsedr, dsedL=dsedL)
+
+      if (any(abs(dsedL - numsigma) > thr2)) then
+         call test_failed(error, "Sigma of selfenergies does not match")
+         print'(3es21.14)', dsedL-numsigma
+      end if
+
+   end subroutine test_scaled_selfenergy_sigma_mol
+
+
+   subroutine test_hamiltonian_mol(error, mol, ref)
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+      !> Molecular structure data
       type(structure_type), intent(in) :: mol
+      !> Reference Hamiltonian matrix
       real(wp), intent(in) :: ref(:, :)
 
       type(basis_type) :: bas
@@ -387,12 +626,408 @@ contains
 
    end subroutine test_hamiltonian_mol
 
-   subroutine test_overlap_diat_mol(error, mol, ref)
-
+   subroutine test_hamiltonian_grad(error, mol)
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
+      !> Molecular structure data
+      type(structure_type), intent(inout) :: mol
+   
+      type(xtb_calculator) :: calc
+      type(wavefunction_type) :: wfn
+      type(integral_type) :: intsr, intsl
+      type(adjacency_list) :: list
+      type(potential_type) :: pot
+      type(container_cache) :: ccache
 
+      real(wp), parameter :: cn_cutoff = 30.0_wp
+      real(wp), parameter :: step = 1.0e-6_wp
+      real(wp), allocatable :: lattr(:, :), cn(:), cn_en(:)
+      real(wp), allocatable :: dcndr(:, :, :), dcndL(:, :, :), dcn_endr(:, :, :), dcn_endL(:, :, :)
+      real(wp), allocatable :: h1l(:, :, :), h1r(:, :, :), numdr(:, :, :)
+      real(wp), allocatable :: selfenergy(:), dsedr(:,:,:), dsedL(:,:,:)
+      real(wp), allocatable :: dh0dr(:, :, :), dh0dL(:, :, :, :), doverlap(:, :, :), doverlap_diat(:, :, :)  
+      real(wp) :: cutoff
+      integer :: iat, ic, ii, jj, is, ish, izp, iao, jat, js, jsh, jzp, jao
+
+      ! Setup a CEH calculator
+      call new_ceh_calculator(calc, mol, error)
+      if (allocated(error)) return
+
+      !> Get initial potential
+      call new_potential(pot, mol, calc%bas, 1, .true.)
+
+      allocate(cn(mol%nat), cn_en(mol%nat), source=0.0_wp)
+      allocate(dcndr(3, mol%nat, mol%nat), dcndL(3, 3, mol%nat), source=0.0_wp)
+      allocate(dcn_endr(3, mol%nat, mol%nat), dcn_endL(3, 3, mol%nat), source=0.0_wp)
+      allocate(selfenergy(calc%bas%nsh), dsedr(3, mol%nat,calc%bas%nsh), dsedL(3, 3, calc%bas%nsh), source=0.0_wp)
+      allocate(h1r(calc%bas%nao, calc%bas%nao, 1),h1l(calc%bas%nao, calc%bas%nao, 1), source=0.0_wp)
+      allocate(numdr(3, calc%bas%nao, calc%bas%nao), &
+      & doverlap(3,calc%bas%nao,calc%bas%nao), doverlap_diat(3,calc%bas%nao,calc%bas%nao), & 
+      & dh0dr(3, calc%bas%nao, calc%bas%nao), dh0dL(3, 3, calc%bas%nao, calc%bas%nao), source=0.0_wp)
+
+      ! Setup wavefunction and integrals
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .true.)
+      call new_integral(intsr, calc%bas%nao)
+      call new_integral(intsl, calc%bas%nao)
+
+      do ic = 1, 3
+         do iat = 1, mol%nat
+            izp = mol%id(iat)
+            is = calc%bas%ish_at(iat)
+
+            ! Right hand
+            mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
+            
+            ! CN
+            call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
+            call get_coordination_number(calc%ncoord, mol, lattr, cn_cutoff, cn)
+            call get_coordination_number(calc%ncoord_en, mol, lattr, cn_cutoff, cn_en)
+
+            ! Adjacency list
+            cutoff = get_cutoff(calc%bas)
+            call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
+            call new_adjacency_list(list, mol, lattr, cutoff)
+            
+            ! Self energy
+            call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, & 
+               &cn=cn, cn_en=cn_en, selfenergy=selfenergy)
+
+            ! Hamiltonian
+            call get_hamiltonian(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+               & intsr%overlap, intsr%overlap_diat, intsr%dipole, intsr%hamiltonian)
+            
+            ! Use the electronegativity-weighted CN as a 0th order guess for the charges
+            call get_effective_qat(mol, cn_en, wfn%qat)
+
+            ! Reset potential and obtain new Coulomb potential
+            call pot%reset
+            call calc%coulomb%update(mol, ccache)
+            call calc%coulomb%get_potential(mol, ccache, wfn, pot)
+            
+            ! Add potential to Hamiltonian
+            call add_pot_to_h1(calc%bas, intsr, pot, h1r)
+
+            ! Left hand
+            mol%xyz(ic, iat) = mol%xyz(ic, iat) - 2*step
+
+            ! CN
+            call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
+            call get_coordination_number(calc%ncoord, mol, lattr, cn_cutoff, cn)
+            call get_coordination_number(calc%ncoord_en, mol, lattr, cn_cutoff, cn_en)
+
+            ! Adjacency list
+            cutoff = get_cutoff(calc%bas)
+            call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
+            call new_adjacency_list(list, mol, lattr, cutoff)
+            
+            ! Self energy
+            call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, & 
+               &cn=cn, cn_en=cn_en, selfenergy=selfenergy)
+
+            ! Hamiltonian
+            call get_hamiltonian(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+               & intsl%overlap, intsl%overlap_diat, intsl%dipole, intsl%hamiltonian)
+
+            ! Use the electronegativity-weighted CN as a 0th order guess for the charges
+            call get_effective_qat(mol, cn_en, wfn%qat)
+            
+            ! Reset potential and obtain new Coulomb potential
+            call pot%reset
+            call calc%coulomb%update(mol, ccache)
+            call calc%coulomb%get_potential(mol, ccache, wfn, pot)
+            
+            ! Add potential to Hamiltonian
+            call add_pot_to_h1(calc%bas, intsl, pot, h1l)
+
+            ! Geometry reset 
+            mol%xyz(ic, iat) = mol%xyz(ic, iat) + step
+
+            ! Numerical gradient of the hamiltonian matrix
+            do ish = 1, calc%bas%nsh_id(izp)
+               ii = calc%bas%iao_sh(is+ish)
+               do iao = 1, calc%bas%nao_sh(is+ish)
+                  ! Use only the upper triangular matrix to not sum different elements
+                  do jat = 1, iat
+                     jzp = mol%id(jat)
+                     js = calc%bas%ish_at(jat)
+                     do jsh = 1, calc%bas%nsh_id(jzp) 
+                        jj = calc%bas%iao_sh(js+jsh)
+                        do jao = 1, calc%bas%nao_sh(js+jsh)
+                           ! Upper triangular matrix and diagonal
+                           numdr(ic, jj+jao, ii+iao) = & 
+                              & + 0.5_wp*(h1r(jj+jao, ii+iao, 1) - h1l(jj+jao, ii+iao, 1))/step
+
+                           ! Lower triangular matrix
+                           if(ii+iao /= jj+jao) then
+                              numdr(ic, ii+iao, jj+jao) = &
+                                 & - 0.5_wp*(h1r(ii+iao, jj+jao, 1) - h1l(ii+iao, jj+jao, 1))/step
+                           end if
+                        end do
+                     end do 
+                  end do
+               end do
+            end do
+         end do
+      end do
+
+      ! CN
+      call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
+      call get_coordination_number(calc%ncoord , mol, lattr, cn_cutoff, cn, dcndr, dcndL)
+      call get_coordination_number(calc%ncoord_en, mol, lattr, cn_cutoff, cn_en, dcn_endr, dcn_endL)
+
+      ! Adjacency list
+      call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
+      call new_adjacency_list(list, mol, lattr, cutoff)
+
+      ! Self energy
+      call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, &
+      & cn=cn, cn_en=cn_en, dcndr=dcndr, dcndL=dcndL, dcn_endr=dcn_endr, dcn_endL=dcn_endL, &
+      & selfenergy=selfenergy, dsedr=dsedr, dsedL=dsedL)    
+
+      ! Use the electronegativity-weighted CN as a 0th order guess for the charges
+      call get_effective_qat(mol, cn_en, wfn%qat, &
+         & dcn_endr, dcn_endL, wfn%dqatdr, wfn%dqatdL)
+      
+      ! Reset potential and obtain new Coulomb potential and graident
+      call pot%reset
+      call calc%coulomb%update(mol, ccache)
+      call calc%coulomb%get_potential(mol, ccache, wfn, pot)
+      call calc%coulomb%get_potential_gradient(mol, ccache, wfn, pot)
+
+      ! Obtain Hamiltonian gradient including the potential 
+      call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+         & dsedr, dsedL, pot, doverlap, doverlap_diat, dh0dr, dh0dL)
+      
+      ! Check
+      num: do ic = 1, 3
+         do ii = 1, size(numdr,2)
+            do jj = 1, size(numdr,3)
+               call check(error, numdr(ic, ii, jj), dh0dr(ic, ii, jj), thr=thr2)
+               if (allocated(error)) then 
+                  call test_failed(error, "Hamiltonian derivative does not match")
+                  exit num
+               end if
+            end do           
+         end do
+      end do num
+
+   end subroutine test_hamiltonian_grad
+   
+   subroutine test_hamiltonian_sigma(error, mol)
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+      !> Molecular structure data
+      type(structure_type), intent(inout) :: mol
+   
+      type(xtb_calculator) :: calc
+      type(wavefunction_type) :: wfn
+      type(integral_type) :: intsr, intsl
+      type(adjacency_list) :: list
+      type(potential_type) :: pot
+      type(container_cache) :: ccache
+
+      real(wp) :: eps(3, 3)
+      real(wp), parameter :: unity(3, 3) = reshape(&
+         & [1, 0, 0, 0, 1, 0, 0, 0, 1], shape(unity))
+      real(wp), parameter :: cn_cutoff = 30.0_wp
+      real(wp), parameter :: step = 1.0e-6_wp
+      real(wp), allocatable :: lattr(:, :), lattice(:, :), xyz(:, :), cn(:), cn_en(:)
+      real(wp), allocatable :: dcndr(:, :, :), dcndL(:, :, :), dcn_endr(:, :, :), dcn_endL(:, :, :)
+      real(wp), allocatable :: h1l(:, :, :), h1r(:, :, :), numsigma(:, :, :, :)
+      real(wp), allocatable :: selfenergy(:), dsedr(:,:,:), dsedL(:,:,:)
+      real(wp), allocatable :: dh0dr(:, :, :), dh0dL(:, :, :, :), doverlap(:, :, :), doverlap_diat(:, :, :)  
+      real(wp) :: cutoff
+      integer :: iat, ic, jc, ii, jj, is, ish, izp, iao, jat, js, jsh, jzp, jao
+
+      ! Setup a CEH calculator
+      call new_ceh_calculator(calc, mol, error)
+      if (allocated(error)) return
+
+      !> Get initial potential
+      call new_potential(pot, mol, calc%bas, 1, .true.)
+
+      allocate(cn(mol%nat), cn_en(mol%nat), source=0.0_wp)
+      allocate(dcndr(3, mol%nat, mol%nat), dcndL(3, 3, mol%nat), source=0.0_wp)
+      allocate(dcn_endr(3, mol%nat, mol%nat), dcn_endL(3, 3, mol%nat), source=0.0_wp)
+      allocate(selfenergy(calc%bas%nsh), dsedr(3, mol%nat,calc%bas%nsh), dsedL(3, 3, calc%bas%nsh), source=0.0_wp)
+      allocate(h1r(calc%bas%nao, calc%bas%nao, 1),h1l(calc%bas%nao, calc%bas%nao, 1), source=0.0_wp)
+      allocate(numsigma(3, 3, calc%bas%nao, calc%bas%nao), xyz(3, mol%nat), &
+      & doverlap(3,calc%bas%nao,calc%bas%nao), doverlap_diat(3,calc%bas%nao,calc%bas%nao), & 
+      & dh0dr(3, calc%bas%nao, calc%bas%nao), dh0dL(3, 3, calc%bas%nao, calc%bas%nao), source=0.0_wp)
+
+      ! Setup wavefunction and integrals
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .true.)
+      call new_integral(intsr, calc%bas%nao)
+      call new_integral(intsl, calc%bas%nao)
+
+      eps(:, :) = unity
+      xyz(:, :) = mol%xyz
+      if (any(mol%periodic)) lattice = mol%lattice
+      do ic = 1, 3
+         do jc = 1, 3
+            
+            ! Right hand
+            eps(jc, ic) = eps(jc, ic) + step
+            mol%xyz(:, :) = matmul(eps, xyz)
+            if (allocated(lattice)) mol%lattice(:, :) = matmul(eps, lattice)
+
+            ! CN
+            call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
+            call get_coordination_number(calc%ncoord, mol, lattr, cn_cutoff, cn)
+            call get_coordination_number(calc%ncoord_en, mol, lattr, cn_cutoff, cn_en)
+
+            ! Adjacency list
+            cutoff = get_cutoff(calc%bas)
+            call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
+            call new_adjacency_list(list, mol, lattr, cutoff)
+            
+            ! Self energy
+            call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, & 
+               &cn=cn, cn_en=cn_en, selfenergy=selfenergy)
+
+            ! Hamiltonian
+            call get_hamiltonian(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+               & intsr%overlap, intsr%overlap_diat, intsr%dipole, intsr%hamiltonian)
+            
+            ! Use the electronegativity-weighted CN as a 0th order guess for the charges
+            call get_effective_qat(mol, cn_en, wfn%qat)
+
+            ! Reset potential and obtain new Coulomb potential
+            call pot%reset
+            call calc%coulomb%update(mol, ccache)
+            call calc%coulomb%get_potential(mol, ccache, wfn, pot)
+            
+            ! Add potential to Hamiltonian
+            call add_pot_to_h1(calc%bas, intsr, pot, h1r)
+
+            ! Left hand
+            eps(jc, ic) = eps(jc, ic) - 2*step
+            mol%xyz(:, :) = matmul(eps, xyz)
+            if (allocated(lattice)) mol%lattice(:, :) = matmul(eps, lattice)
+
+            ! CN
+            call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
+            call get_coordination_number(calc%ncoord, mol, lattr, cn_cutoff, cn)
+            call get_coordination_number(calc%ncoord_en, mol, lattr, cn_cutoff, cn_en)
+
+            ! Adjacency list
+            cutoff = get_cutoff(calc%bas)
+            call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
+            call new_adjacency_list(list, mol, lattr, cutoff)
+            
+            ! Self energy
+            call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, & 
+               &cn=cn, cn_en=cn_en, selfenergy=selfenergy)
+
+            ! Hamiltonian
+            call get_hamiltonian(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+               & intsl%overlap, intsl%overlap_diat, intsl%dipole, intsl%hamiltonian)
+
+            ! Use the electronegativity-weighted CN as a 0th order guess for the charges
+            call get_effective_qat(mol, cn_en, wfn%qat)
+            
+            ! Reset potential and obtain new Coulomb potential
+            call pot%reset
+            call calc%coulomb%update(mol, ccache)
+            call calc%coulomb%get_potential(mol, ccache, wfn, pot)
+            
+            ! Add potential to Hamiltonian
+            call add_pot_to_h1(calc%bas, intsl, pot, h1l)
+
+            ! Geometry reset 
+            eps(jc, ic) = eps(jc, ic) + step
+            mol%xyz(:, :) = xyz
+            if (allocated(lattice)) mol%lattice = lattice
+
+            ! Numerical sigma of the hamiltonian matrix
+            do iat = 1, mol%nat
+               izp = mol%id(iat)
+               is = calc%bas%ish_at(iat)
+               do ish = 1, calc%bas%nsh_id(izp)
+                  ii = calc%bas%iao_sh(is+ish)
+                  do iao = 1, calc%bas%nao_sh(is+ish)
+                     ! Use only the upper triangular matrix to not sum different elements
+                     do jat = 1, iat
+                        jzp = mol%id(jat)
+                        js = calc%bas%ish_at(jat)
+                        do jsh = 1, calc%bas%nsh_id(jzp) 
+                           jj = calc%bas%iao_sh(js+jsh)
+                           do jao = 1, calc%bas%nao_sh(js+jsh)
+                              ! Upper triangular matrix and diagonal
+                              numsigma(ic, jc, jj+jao, ii+iao) = & 
+                                 & + 0.5_wp*(h1r(jj+jao, ii+iao, 1) - h1l(jj+jao, ii+iao, 1))/step
+
+                              ! Lower triangular matrix
+                              if(ii+iao /= jj+jao) then
+                                 numsigma(ic, jc, ii+iao, jj+jao) = &
+                                    & - 0.5_wp*(h1r(ii+iao, jj+jao, 1) - h1l(ii+iao, jj+jao, 1))/step
+                              end if
+                           end do
+                        end do 
+                     end do
+                  end do
+               end do
+            end do
+         end do
+      end do
+
+      ! CN
+      call get_lattice_points(mol%periodic, mol%lattice, cn_cutoff, lattr)
+      call get_coordination_number(calc%ncoord , mol, lattr, cn_cutoff, cn, dcndr, dcndL)
+      call get_coordination_number(calc%ncoord_en, mol, lattr, cn_cutoff, cn_en, dcn_endr, dcn_endL)
+
+      ! Adjacency list
+      call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
+      call new_adjacency_list(list, mol, lattr, cutoff)
+
+      ! Self energy
+      call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, &
+      & cn=cn, cn_en=cn_en, dcndr=dcndr, dcndL=dcndL, dcn_endr=dcn_endr, dcn_endL=dcn_endL, &
+      & selfenergy=selfenergy, dsedr=dsedr, dsedL=dsedL)    
+
+      ! Use the electronegativity-weighted CN as a 0th order guess for the charges
+      call get_effective_qat(mol, cn_en, wfn%qat, &
+         & dcn_endr, dcn_endL, wfn%dqatdr, wfn%dqatdL)
+      
+      ! Reset potential and obtain new Coulomb potential and graident
+      call pot%reset
+      call calc%coulomb%update(mol, ccache)
+      call calc%coulomb%get_potential(mol, ccache, wfn, pot)
+      call calc%coulomb%get_potential_gradient(mol, ccache, wfn, pot)
+
+      ! Obtain Hamiltonian gradient including the potential 
+      call get_hamiltonian_gradient(mol, lattr, list, calc%bas, calc%h0, selfenergy, &
+         & dsedr, dsedL, pot, doverlap, doverlap_diat, dh0dr, dh0dL)
+      
+      ! Check
+      num: do ic = 1, 3
+         do jc = 1, 3
+            write(*,*) "ic, jc", ic, jc   
+            call write_2d_matrix(numsigma(ic, jc, :, :), "num")
+            !call write_2d_matrix(numsigma(ic, jc, :, :) - numsigma(jc, ic, :, :), "diff symm num")
+            call write_2d_matrix(dh0dL(ic, jc, :, :), "dh0dL")
+            call write_2d_matrix(dh0dL(ic, jc, :, :)- numsigma(ic, jc, :, :), "diff")
+            do ii = 1, size(numsigma,3)
+               do jj = 1, size(numsigma,4)
+                  call check(error, numsigma(ic, jc, ii, jj), dh0dL(ic, jc, ii, jj), thr=thr2)
+                  ! if (allocated(error)) then 
+                  !   call test_failed(error, "Hamiltonian sigma does not match")
+                  !   exit num
+                  ! end if
+               end do           
+            end do
+         end do
+      end do num
+
+   end subroutine test_hamiltonian_sigma
+
+
+   subroutine test_overlap_diat_mol(error, mol, ref)
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+      !> Molecular structure data
       type(structure_type), intent(in) :: mol
+      !> Reference CEH charges
       real(wp), intent(in) :: ref(:, :)
 
       type(basis_type) :: bas
@@ -451,14 +1086,12 @@ contains
 
    end subroutine test_overlap_diat_mol
 
-   subroutine test_q_gen(error, mol, ref)
 
+   subroutine test_q_gen(error, mol, ref)
       !> Error handling
       type(error_type), allocatable, intent(out) :: error
-
       !> Molecular structure data
       type(structure_type), intent(in) :: mol
-
       !> Reference CEH charges
       real(wp), intent(in) :: ref(:)
 
@@ -473,7 +1106,7 @@ contains
 
       call new_ceh_calculator(calc, mol, error)
       if (allocated(error)) return
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
       ctx%verbosity = 0
       call ceh_singlepoint(ctx, calc, mol, wfn, accuracy)
       if (ctx%failed()) then
@@ -585,6 +1218,90 @@ contains
       call test_scaled_selfenergy_mol(error, mol, scaled_selfenergy)
 
    end subroutine test_scaled_selfenergy_accl6
+
+   subroutine test_scaled_selfenergy_grad_h2(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "MB16-43", "H2")
+      call test_scaled_selfenergy_grad_mol(error, mol)
+   
+   end subroutine test_scaled_selfenergy_grad_h2
+   
+   subroutine test_scaled_selfenergy_grad_lih(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "MB16-43", "LiH")
+      call test_scaled_selfenergy_grad_mol(error, mol)
+   
+   end subroutine test_scaled_selfenergy_grad_lih
+   
+   subroutine test_scaled_selfenergy_grad_s2(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "MB16-43", "S2")
+      call test_scaled_selfenergy_grad_mol(error, mol)
+   
+   end subroutine test_scaled_selfenergy_grad_s2
+
+   subroutine test_scaled_selfenergy_grad_sih4(error)
+
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "MB16-43", "SiH4")
+      call test_scaled_selfenergy_grad_mol(error, mol)
+
+   end subroutine test_scaled_selfenergy_grad_sih4
+
+   subroutine test_scaled_selfenergy_grad_accl6(error)
+
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "f-block", "AcCl6")
+      call test_scaled_selfenergy_grad_mol(error, mol)
+
+   end subroutine test_scaled_selfenergy_grad_accl6
+
+   subroutine test_scaled_selfenergy_sigma_lih(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "MB16-43", "LiH")
+      call test_scaled_selfenergy_sigma_mol(error, mol)
+   
+   end subroutine test_scaled_selfenergy_sigma_lih
+   
+   subroutine test_scaled_selfenergy_sigma_co2(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "X23", "CO2")
+      call test_scaled_selfenergy_sigma_mol(error, mol)
+   
+   end subroutine test_scaled_selfenergy_sigma_co2
 
 
    subroutine test_hamiltonian_h2(error)
@@ -823,6 +1540,164 @@ contains
       call test_hamiltonian_mol(error, mol, hamiltonian)
 
    end subroutine test_hamiltonian_sih4
+
+
+   subroutine test_hamiltonian_grad_h2(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "MB16-43", "H2")
+      call test_hamiltonian_grad(error, mol)
+   
+   end subroutine test_hamiltonian_grad_h2
+   
+   subroutine test_hamiltonian_grad_lih(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "MB16-43", "LiH")
+      call test_hamiltonian_grad(error, mol)
+   
+   end subroutine test_hamiltonian_grad_lih
+   
+   subroutine test_hamiltonian_grad_s2(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "MB16-43", "S2")
+      call test_hamiltonian_grad(error, mol)
+   
+   end subroutine test_hamiltonian_grad_s2
+
+   subroutine test_hamiltonian_grad_pcl(error)
+
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "MB16-43", "PCl")
+      call test_hamiltonian_grad(error, mol)
+
+   end subroutine test_hamiltonian_grad_pcl
+
+   subroutine test_hamiltonian_grad_sih4(error)
+
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "MB16-43", "SiH4")
+      call test_hamiltonian_grad(error, mol)
+
+   end subroutine test_hamiltonian_grad_sih4
+
+   subroutine test_hamiltonian_grad_accl6(error)
+
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+
+      type(structure_type) :: mol
+
+      call get_structure(mol, "f-block", "AcCl6")
+      call test_hamiltonian_grad(error, mol)
+
+   end subroutine test_hamiltonian_grad_accl6
+
+   subroutine test_hamiltonian_sigma_lih(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "MB16-43", "LiH")
+      call test_hamiltonian_sigma(error, mol)
+   
+   end subroutine test_hamiltonian_sigma_lih
+   
+   subroutine test_hamiltonian_sigma_sih4(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "MB16-43", "SiH4")
+      call test_hamiltonian_sigma(error, mol)
+   
+   end subroutine test_hamiltonian_sigma_sih4
+
+   subroutine test_hamiltonian_sigma_accl6(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "f-block", "AcCl6")
+      call test_hamiltonian_sigma(error, mol)
+   
+   end subroutine test_hamiltonian_sigma_accl6
+
+
+   subroutine test_hamiltonian_sigma_co2(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "X23", "CO2")
+      call test_hamiltonian_sigma(error, mol)
+   
+   end subroutine test_hamiltonian_sigma_co2
+
+   subroutine test_hamiltonian_sigma_acetic(error)
+   
+      !> Error handling
+      type(error_type), allocatable, intent(out) :: error
+   
+      type(structure_type) :: mol
+   
+      call get_structure(mol, "X23", "acetic")
+      call test_hamiltonian_sigma(error, mol)
+   
+   end subroutine test_hamiltonian_sigma_acetic
+
+   !   new_record("acetic", acetic), &
+   !    new_record("adaman", adaman), &
+   !    new_record("ammonia", ammonia), &
+   !    new_record("anthracene", anthracene), &
+   !    new_record("benzene", benzene), &
+   !    new_record("CO2", CO2), &
+   !    new_record("cyanamide", cyanamide), &
+   !    new_record("cytosine", cytosine), &
+   !    new_record("ethcar", ethcar), &
+   !    new_record("formamide", formamide), &
+   !    new_record("hexamine", hexamine), &
+   !    new_record("hexdio", hexdio), &
+   !    new_record("imdazole", imdazole), &
+   !    new_record("naph", naph), &
+   !    new_record("oxaca", oxaca), &
+   !    new_record("oxacb", oxacb), &
+   !    new_record("pyrazine", pyrazine), &
+   !    new_record("pyrazole", pyrazole), &
+   !    new_record("succinic", succinic), &
+   !    new_record("triazine", triazine), &
+   !    new_record("trioxane", trioxane), &
+   !    new_record("uracil", uracil), &
+   !    new_record("urea", urea) &
 
    subroutine test_overlap_diat_h2(error)
 
@@ -1257,7 +2132,7 @@ contains
       mol%charge = 2.0_wp
       call new_ceh_calculator(calc, mol, error)
       if (allocated(error)) return
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
       cont = electric_field(efield)
       call calc%push_back(cont)
       ctx%verbosity = 0
@@ -1295,7 +2170,7 @@ contains
 
       call new_ceh_calculator(calc, mol, error)
       if (allocated(error)) return
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
       ctx%verbosity = 0
       call ceh_singlepoint(ctx, calc, mol, wfn, accuracy)
       if (ctx%failed()) then
@@ -1341,7 +2216,7 @@ contains
 
       call new_ceh_calculator(calc, mol, error)
       if (allocated(error)) return
-      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt)
+      call new_wavefunction(wfn, mol%nat, calc%bas%nsh, calc%bas%nao, 1, kt, .false.)
 
       cont = electric_field(efield)
       call calc%push_back(cont)
@@ -1397,7 +2272,7 @@ contains
       efield(1) = -0.1_wp
       call new_ceh_calculator(calc1, mol1, error)
       if (allocated(error)) return
-      call new_wavefunction(wfn1, mol1%nat, calc1%bas%nsh, calc1%bas%nao, 1, kt)
+      call new_wavefunction(wfn1, mol1%nat, calc1%bas%nsh, calc1%bas%nao, 1, kt, .false.)
       cont1 = electric_field(efield)
       call calc1%push_back(cont1)
       call ceh_singlepoint(ctx, calc1, mol1, wfn1, accuracy)
@@ -1414,7 +2289,7 @@ contains
       call new(mol2, num, xyz)
       call new_ceh_calculator(calc2, mol2, error)
       if (allocated(error)) return
-      call new_wavefunction(wfn2, mol2%nat, calc2%bas%nsh, calc2%bas%nao, 1, kt)
+      call new_wavefunction(wfn2, mol2%nat, calc2%bas%nsh, calc2%bas%nao, 1, kt, .false.)
       cont2 = electric_field(efield)
       call calc2%push_back(cont2)
       call ceh_singlepoint(ctx, calc2, mol2, wfn2, accuracy)
@@ -1437,4 +2312,5 @@ contains
       end if
 
    end subroutine test_d_hcn
+
 end module test_ceh

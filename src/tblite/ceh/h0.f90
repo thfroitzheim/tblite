@@ -19,6 +19,11 @@
 !> Provides the Hamiltonian level functions for CEH.
 
 module tblite_ceh_h0
+
+   
+   use iso_fortran_env, only: output_unit
+
+
    use mctc_env, only : wp
    use mctc_io, only: structure_type
    use tblite_basis_type, only:  basis_type
@@ -26,34 +31,46 @@ module tblite_ceh_h0
    use tblite_xtb_h0, only : tb_hamiltonian
    use tblite_integral_dipole, only: get_dipole_integrals, dipole_cgto, &
    & maxl, msao, smap
+   use tblite_integral_overlap, only: overlap_grad_cgto
    use tblite_adjlist, only : adjacency_list
-   use tblite_integral_diat_trafo, only: diat_trafo
+   use tblite_scf_potential, only : potential_type
+   use tblite_integral_diat_trafo, only: diat_trafo, diat_trafo_grad
 
    implicit none
    private
 
-   public :: get_scaled_selfenergy, get_hamiltonian, get_occupation
+   public :: get_scaled_selfenergy, get_hamiltonian, get_hamiltonian_gradient, get_occupation
 
 contains
 
 
    !> Scale the selfenergy parameters by the CN
-   subroutine get_scaled_selfenergy(h0, id, ish_at, nshell, cn, cn_en, selfenergy, dsedcn, dsedcn_en)
+   !> The gradient of the self energy is evaluated directly w.r.t. the positions R 
+   !> because two CN-dependencies exist and cannot be separated.
+   subroutine get_scaled_selfenergy(h0, id, ish_at, nshell, cn, cn_en, &
+      & dcndr, dcndL, dcn_endr, dcn_endL, selfenergy, dsedr, dsedL)
       type(tb_hamiltonian), intent(in) :: h0
       integer, intent(in) :: id(:)
       integer, intent(in) :: ish_at(:)
       integer, intent(in) :: nshell(:)
       real(wp), intent(in), optional :: cn(:)
       real(wp), intent(in), optional :: cn_en(:)
+
+      real(wp), intent(in), optional :: dcndr(:,:,:)
+      real(wp), intent(in), optional :: dcndL(:,:,:)
+      real(wp), intent(in), optional :: dcn_endr(:,:,:)
+      real(wp), intent(in), optional :: dcn_endL(:,:,:)
+      
       real(wp), intent(out) :: selfenergy(:)
-      real(wp), intent(out), optional :: dsedcn(:)
-      real(wp), intent(out), optional :: dsedcn_en(:)
+      real(wp), intent(out), optional :: dsedr(:,:,:)
+      real(wp), intent(out), optional :: dsedL(:,:,:)
 
       integer :: iat, izp, ish, ii
 
       selfenergy(:) = 0.0_wp
-      if (present(dsedcn)) dsedcn(:) = 0.0_wp
-      if (present(dsedcn_en)) dsedcn_en(:) = 0.0_wp
+
+      if (present(dsedr)) dsedr(:,:,:) = 0.0_wp
+      if (present(dsedL)) dsedL(:,:,:) = 0.0_wp
       do iat = 1, size(id)
          izp = id(iat)
          ii = ish_at(iat)
@@ -61,31 +78,82 @@ contains
             selfenergy(ii+ish) = h0%selfenergy(ish, izp)
          end do
       end do
-      if (.not.present(cn) .or. .not.present(cn_en)) return
-      if (present(dsedcn) .and. present(dsedcn_en)) then
-         do iat = 1, size(id)
-            izp = id(iat)
-            ii = ish_at(iat)
-            do ish = 1, nshell(izp)
-               selfenergy(ii+ish) = selfenergy(ii+ish) + h0%kcn(ish, izp) * cn(iat) + &
-               &  h0%kcn_en(ish, izp) * cn_en(iat)
-               dsedcn(ii+ish) = h0%kcn(ish, izp)
-               dsedcn_en(ii+ish) = h0%kcn_en(ish, izp)
+
+      if (present(cn) .and. present(cn_en)) then
+         if (present(dcndr) .and. present(dcndL) .and. present(dcn_endr) .and. present(dcn_endL) &
+            & .and. present(dsedr) .and. present(dsedL)) then
+            do iat = 1, size(id)
+               izp = id(iat)
+               ii = ish_at(iat)
+               do ish = 1, nshell(izp)
+                  selfenergy(ii+ish) = selfenergy(ii+ish) + h0%kcn(ish, izp) * cn(iat) + &
+                  &  h0%kcn_en(ish, izp) * cn_en(iat)
+
+                     dsedr(:,:,ii+ish) = dsedr(:,:,ii+ish) + h0%kcn(ish, izp) * dcndr(:,:,iat) + &
+                     &  h0%kcn_en(ish, izp) * dcn_endr(:,:,iat)
+                     dsedL(:,:,ii+ish) = dsedL(:,:,ii+ish) + h0%kcn(ish, izp) * dcndL(:,:,iat) + &
+                     &  h0%kcn_en(ish, izp) * dcn_endL(:,:,iat)
+               end do
             end do
-         end do
-      else
-         do iat = 1, size(id)
-            izp = id(iat)
-            ii = ish_at(iat)
-            do ish = 1, nshell(izp)
-               selfenergy(ii+ish) = selfenergy(ii+ish) + h0%kcn(ish, izp) * cn(iat) + &
-               &  h0%kcn_en(ish, izp) * cn_en(iat)
+         else
+            do iat = 1, size(id)
+               izp = id(iat)
+               ii = ish_at(iat)
+               do ish = 1, nshell(izp)
+                  selfenergy(ii+ish) = selfenergy(ii+ish) + h0%kcn(ish, izp) * cn(iat) + &
+                  &  h0%kcn_en(ish, izp) * cn_en(iat)
+               end do
             end do
-         end do
+         end if
       end if
 
    end subroutine get_scaled_selfenergy
 
+
+
+   subroutine write_2d_matrix(matrix, name, unit, step)
+      implicit none
+      real(wp), intent(in) :: matrix(:, :)
+      character(len=*), intent(in), optional :: name
+      integer, intent(in), optional :: unit
+      integer, intent(in), optional :: step
+      integer :: d1, d2
+      integer :: i, j, k, l, istep, iunit
+  
+      d1 = size(matrix, dim=1)
+      d2 = size(matrix, dim=2)
+  
+      if (present(unit)) then
+        iunit = unit
+      else
+        iunit = output_unit
+      end if
+  
+      if (present(step)) then
+        istep = step
+      else
+        istep = 6
+      end if
+  
+      if (present(name)) write (iunit, '(/,"matrix printed:",1x,a)') name
+  
+      do i = 1, d2, istep
+        l = min(i + istep - 1, d2)
+        write (iunit, '(/,6x)', advance='no')
+        do k = i, l
+          write (iunit, '(6x,i7,3x)', advance='no') k
+        end do
+        write (iunit, '(a)')
+        do j = 1, d1
+          write (iunit, '(i6)', advance='no') j
+          do k = i, l
+            write (iunit, '(1x,f15.12)', advance='no') matrix(j, k)
+          end do
+          write (iunit, '(a)')
+        end do
+      end do
+  
+    end subroutine write_2d_matrix
 
    subroutine get_hamiltonian(mol, trans, list, bas, h0, selfenergy, &
    & overlap, overlap_diat, dpint, hamiltonian)
@@ -112,7 +180,7 @@ contains
 
       integer  :: itr, img, inl, ii, jj, is, js, jzp, izp, nao
       integer  :: iat, ish, jat, jsh, k, iao, jao, ij, iaosh, jaosh
-      real(wp) :: hij, rr, r2, vec(3), dtmpj(3)
+      real(wp) :: hij, r2, vec(3), dtmpj(3)
       real(wp), allocatable :: stmp(:), dtmpi(:, :), block_overlap(:,:)
       integer :: kl, l
 
@@ -128,7 +196,7 @@ contains
       !$omp parallel do schedule(runtime) default(none) &
       !$omp shared(mol, bas, trans, list, overlap, overlap_diat, dpint, hamiltonian, h0, selfenergy) &
       !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, ij, iaosh, jaosh, k) &
-      !$omp private(r2, vec, stmp, block_overlap, dtmpi, dtmpj, hij, rr, inl, img)
+      !$omp private(r2, vec, stmp, block_overlap, dtmpi, dtmpj, hij, inl, img)
       do iat = 1, mol%nat
          izp = mol%id(iat)
          is = bas%ish_at(iat)
@@ -140,7 +208,6 @@ contains
             js = bas%ish_at(jat)
             vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
             r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
-            rr = sqrt(sqrt(r2) / (h0%rad(jzp) + h0%rad(izp)))
 
             ! Get the overlap and dipole integrals for the current diatomic pair
             block_overlap = 0.0_wp
@@ -241,13 +308,12 @@ contains
       !$omp parallel do schedule(runtime) default(none) &
       !$omp shared(mol, bas, trans, overlap, overlap_diat, dpint, hamiltonian, h0, selfenergy) &
       !$omp private(iat, izp, itr, is, ish, jsh, ii, jj, iao, jao, nao, ij) &
-      !$omp private(r2, vec, stmp, dtmpi, hij, rr)
+      !$omp private(r2, vec, stmp, dtmpi, hij)
       do iat = 1, mol%nat
          izp = mol%id(iat)
          is = bas%ish_at(iat)
          vec(:) = 0.0_wp
          r2 = 0.0_wp
-         rr = sqrt(sqrt(r2) / (h0%rad(izp) + h0%rad(izp)))
          do ish = 1, bas%nsh_id(izp)
             ii = bas%iao_sh(is+ish)
             do jsh = 1, bas%nsh_id(izp)
@@ -258,9 +324,12 @@ contains
                do iao = 1, msao(bas%cgto(ish, izp)%ang)
                   do jao = 1, nao
                      ij = jao + nao*(iao-1)
+
+                     !$omp atomic
                      overlap(jj+jao, ii+iao) = overlap(jj+jao, ii+iao) &
                         + stmp(ij)
 
+                     !$omp atomic
                      overlap_diat(jj+jao, ii+iao) = overlap_diat(jj+jao, ii+iao) &
                         + stmp(ij)
 
@@ -277,6 +346,202 @@ contains
       end do
 
    end subroutine get_hamiltonian
+
+
+   subroutine get_hamiltonian_gradient(mol, trans, list, bas, h0, selfenergy, &
+         & dsedr, dsedL, pot, doverlap, doverlap_diat, dh0dr, dh0dL)
+      !> Molecular structure data
+      type(structure_type), intent(in) :: mol
+      !> Lattice points within a given realspace cutoff
+      real(wp), intent(in) :: trans(:, :)
+      !> Neighbour list
+      type(adjacency_list), intent(in) :: list
+      !> Basis set information
+      type(basis_type), intent(in) :: bas
+      !> Hamiltonian interaction data
+      type(tb_hamiltonian), intent(in) :: h0
+      !> Diagonal elememts of the Hamiltonian
+      real(wp), intent(in) :: selfenergy(:)
+      !> Derivative of the diagonal elements of the Hamiltonian w.r.t. the position
+      real(wp), intent(in) :: dsedr(:, :, :)
+      !> Derivative of the diagonal elements of the Hamiltonian w.r.t. the lattice vector
+      real(wp), intent(in) :: dsedL(:, :, :)
+      !> Density dependent potential shifts on the Hamiltonian
+      type(potential_type), intent(in) :: pot
+      !> Derivative of the overlap matrix w.r.t. coordinates
+      real(wp), intent(inout) :: doverlap(:, :, :)
+      !> Derivative of the diatomic frame-scaled overlap matrix w.r.t. coordinates
+      real(wp), intent(inout) :: doverlap_diat(:, :, :)
+      !> Derivative of the Hamiltonian matrix w.r.t. coordinates
+      real(wp), intent(inout) :: dh0dr(:, :, :)
+      !> Derivative of the Hamiltonian matrix w.r.t. the lattice vector
+      real(wp), intent(inout) :: dh0dL(:, :, :, :)
+   
+      integer :: iat, jat, izp, jzp, itr, img, inl, spin, nspin, ic, jc
+      integer :: ish, jsh, is, js, ii, jj, iao, jao, nao, ij, iaosh, jaosh
+      real(wp) :: r2, vec(3), hij, vij, dG(3), dS(3, 3)
+      real(wp), allocatable :: stmp(:), dstmp(:, :)
+      real(wp), allocatable :: block_overlap(:, :), block_doverlap(:, :, :)
+      real(wp), allocatable :: dhijdr(:, :), dhijdL(:, :), dvijdr(:, :), dvijdL(:, :)
+
+      doverlap(:, :, :) = 0.0_wp
+      doverlap_diat(:, :, :) = 0.0_wp
+      dh0dr(:, :, :) = 0.0_wp
+      dh0dL(:, :, :, :) = 0.0_wp
+
+      allocate(stmp(msao(bas%maxl)**2), dstmp(3, msao(bas%maxl)**2), &
+      & block_overlap(smap(bas%maxl+1),smap(bas%maxl+1)), block_doverlap(3,smap(bas%maxl+1),smap(bas%maxl+1)), &
+      & dhijdr(3,mol%nat), dhijdL(3,3), dvijdr(3,mol%nat), dvijdL(3,3))
+
+      !$omp parallel do schedule(runtime) default(none) reduction(+: doverlap, doverlap_diat, dh0dr, dh0dL) &
+      !$omp shared(mol, bas, trans, h0, selfenergy, dsedr, dsedL, pot, list) &
+      !$omp private(iat, jat, izp, jzp, itr, is, js, ish, jsh, ii, jj, iao, jao, nao, ij, iaosh, jaosh, &
+      !$omp& r2, vec, stmp, dstmp, block_overlap, block_doverlap, hij, vij, dhijdr, dhijdL, dvijdr, dvijdL, inl, img)
+      do iat = 1, mol%nat
+         izp = mol%id(iat)
+         is = bas%ish_at(iat)
+         inl = list%inl(iat)
+         do img = 1, list%nnl(iat)
+            jat = list%nlat(img+inl)
+            itr = list%nltr(img+inl)
+            jzp = mol%id(jat)
+            js = bas%ish_at(jat)
+            vec(:) = mol%xyz(:, iat) - mol%xyz(:, jat) - trans(:, itr)
+            r2 = vec(1)**2 + vec(2)**2 + vec(3)**2
+            
+            ! Setup the potential intermediate for the current atom pair
+            vij = - 0.5_wp * (pot%vat(iat, 1) + pot%vat(jat, 1))
+            dvijdr(:, :) = - 0.5_wp * (pot%dvatdr(:, :, iat, 1) + pot%dvatdr(:, :, jat, 1)) 
+            dvijdL(:, :) = - 0.5_wp * (pot%dvatdL(:, :, iat, 1) + pot%dvatdL(:, :, jat, 1)) 
+
+            ! Get the overlap gradient integrals for the current diatomic pair
+            block_overlap = 0.0_wp
+            block_doverlap = 0.0_wp
+            do ish = 1, bas%nsh_id(izp)
+               ii = bas%iao_sh(is+ish)
+               iaosh = smap(ish-1) ! Offset for the block overlap matrix
+               do jsh = 1, bas%nsh_id(jzp)
+                  jj = bas%iao_sh(js+jsh)
+                  jaosh = smap(jsh-1) ! Offset for the block overlap matrix
+                  
+                  call overlap_grad_cgto(bas%cgto(jsh,jzp), bas%cgto(ish,izp), r2, vec, &
+                  & bas%intcut, stmp, dstmp)
+
+                  ! Store the overlap and overlap gradient
+                  nao = msao(bas%cgto(jsh, jzp)%ang)
+                  do iao = 1, msao(bas%cgto(ish, izp)%ang)
+                     do jao = 1, nao
+                        ij = jao + nao*(iao-1)
+
+                        !$omp atomic
+                        block_overlap(jaosh+jao, iaosh+iao) = block_overlap(jaosh+jao, iaosh+iao) &
+                           + stmp(ij)
+                        block_doverlap(:, jaosh+jao, iaosh+iao) = block_doverlap(:, jaosh+jao, iaosh+iao) &
+                           + dstmp(:, ij)
+
+                        doverlap(:, jj+jao, ii+iao) = doverlap(:, jj+jao, ii+iao) &
+                           & + dstmp(:,ij)
+                        doverlap(:, ii+iao, jj+jao) = doverlap(:, ii+iao, jj+jao) &
+                           & - dstmp(:,ij)
+
+                        dh0dr(:, jj+jao, ii+iao) = dh0dr(:, jj+jao, ii+iao) &
+                           & + dstmp(:, ij) * vij + stmp(ij) * dvijdr(:, iat)
+                        dh0dr(:, ii+iao, jj+jao) = dh0dr(:, ii+iao, jj+jao) &
+                           & - dstmp(:, ij) * vij - stmp(ij) * dvijdr(:, iat)
+
+                        dG(:) = dstmp(:, ij) * vij
+                        dS(:,:) = spread(dG, 1, 3) * spread(vec, 2, 3)
+                        ! dS(:,:) = 0.5_wp * (spread(vec, 1, 3) * spread(dG, 2, 3) &
+                        !    & + spread(dG, 1, 3) * spread(vec, 2, 3))
+                        ! dS2(:,:) = 0.5_wp * (spread(vec, 1, 3) * spread(dG, 2, 3) &
+                        !    & - spread(dG, 1, 3) * spread(vec, 2, 3))
+
+                        dh0dL(:, :, jj+jao, ii+iao) = dh0dL(:, :, jj+jao, ii+iao) &
+                           & + dS(:, :) + stmp(ij) * dvijdL(:, :) ! - dS2(:, :)
+                        dh0dL(:, :, ii+iao, jj+jao) = dh0dL(:, :, ii+iao, jj+jao) &
+                           & - dS(:, :) - stmp(ij) * dvijdL(:, :) ! + dS2(:, :)
+
+                     end do
+                  end do
+               end do
+            end do
+
+            ! Diatomic frame transformation and scaling of the overlap gradient
+            call diat_trafo_grad(block_overlap, block_doverlap, vec, h0%ksig(izp,jzp), h0%kpi(izp,jzp), h0%kdel(izp,jzp), &
+               & bas%nsh_at(jat)-1, bas%nsh_at(iat)-1)
+
+            ! Setup the Hamiltonian gradient and store the diatomic frame scaled overlap gradient. 
+            do ish = 1, bas%nsh_id(izp)
+               ii = bas%iao_sh(is+ish)
+               iaosh = smap(ish-1) ! Offset for the block overlap matrix
+               do jsh = 1, bas%nsh_id(jzp)
+                  jj = bas%iao_sh(js+jsh)
+                  jaosh = smap(jsh-1) ! Offset for the block overlap matrix
+                  
+                  ! Setup Hamiltonian intermediate for the current shell pair
+                  hij = 0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (selfenergy(is+ish) + selfenergy(js+jsh))
+                  dhijdr(:, :) = 0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (dsedr(:, :, is+ish) + dsedr(:, :, js+jsh)) 
+                  dhijdL(:, :) = 0.5_wp * h0%hscale(jsh, ish, jzp, izp) * (dsedL(:, :, is+ish) + dsedL(:, :, js+jsh)) 
+   
+                  nao = msao(bas%cgto(jsh, jzp)%ang)
+                  do iao = 1, msao(bas%cgto(ish, izp)%ang)
+                     do jao = 1, nao
+                        ij = jao + nao*(iao-1)
+
+                        doverlap_diat(:, jj+jao, ii+iao) = doverlap_diat(:, jj+jao, ii+iao) &
+                           & + block_doverlap(:, jaosh+jao, iaosh+iao)
+                        doverlap_diat(:, ii+iao, jj+jao) = doverlap_diat(:, ii+iao, jj+jao) &
+                           & - block_doverlap(:, jaosh+jao, iaosh+iao)
+
+                        dh0dr(:, jj+jao, ii+iao) = dh0dr(:, jj+jao, ii+iao) &
+                           & + block_doverlap(:, jaosh+jao, iaosh+iao) * hij &
+                           & + block_overlap(jaosh+jao, iaosh+iao) * dhijdr(:, iat)
+                        dh0dr(:, ii+iao, jj+jao) = dh0dr(:, ii+iao, jj+jao) &
+                           & - block_doverlap(:, jaosh+jao, iaosh+iao) * hij &
+                           & - block_overlap(jaosh+jao, iaosh+iao) * dhijdr(:, iat)
+                        
+                        dG(:) = block_doverlap(:, jaosh+jao, iaosh+iao) * hij
+
+                        dS(:,:) = spread(dG, 1, 3) * spread(vec, 2, 3)
+                        ! dS(:,:) = 0.5_wp * (spread(vec, 1, 3) * spread(dG, 2, 3) &
+                        !    & + spread(dG, 1, 3) * spread(vec, 2, 3))
+                        ! dS2(:,:) = 0.5_wp * (spread(vec, 1, 3) * spread(dG, 2, 3) &
+                        !    & - spread(dG, 1, 3) * spread(vec, 2, 3))
+
+                        dh0dL(:, :, jj+jao, ii+iao) = dh0dL(:, :, jj+jao, ii+iao) + dS & ! - dS2 &
+                           & + block_overlap(jaosh+jao, iaosh+iao) * dhijdL(:, :)
+                        dh0dL(:, :, ii+iao, jj+jao) = dh0dL(:, :, ii+iao, jj+jao) - dS & ! + dS2 &
+                           & - block_overlap(jaosh+jao, iaosh+iao) * dhijdL(:, :)
+
+                     end do
+                  end do 
+               end do
+            end do
+         end do
+      end do
+   
+      !$omp parallel do schedule(runtime) default(none) reduction(+:dh0dr, dh0dL) &
+      !$omp shared(mol, bas, dsedr, dsedL, pot) &
+      !$omp private(iat, izp, jzp, is, ish, ii, iao, dvijdr, dvijdL)
+      do iat = 1, mol%nat
+         izp = mol%id(iat)
+         is = bas%ish_at(iat)
+         
+         ! Setup potential intermediate
+         dvijdr(:, :) = - 0.5_wp * (pot%dvatdr(:, :, iat, 1) + pot%dvatdr(:, :, iat, 1))
+         dvijdL(:, :) = - 0.5_wp * (pot%dvatdL(:, :, iat, 1) + pot%dvatdL(:, :, iat, 1))
+
+         do ish = 1, bas%nsh_id(izp)
+            ii = bas%iao_sh(is+ish)
+            !> diagonal term (AO(i) == AO(j))
+            do iao = 1, msao(bas%cgto(ish, izp)%ang)
+               dh0dr(:, ii+iao, ii+iao) =  dsedr(:, iat, is+ish) + dvijdr(:, iat)
+               dh0dL(:, :, ii+iao, ii+iao) =  dsedL(:, :, is+ish) + dvijdL(:, :)
+            enddo
+         end do
+      end do
+
+   end subroutine get_hamiltonian_gradient
 
 
    subroutine get_occupation(mol, bas, hamiltonian, nocc, n0at, n0sh)

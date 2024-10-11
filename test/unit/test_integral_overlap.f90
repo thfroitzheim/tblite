@@ -20,6 +20,7 @@ module test_integral_overlap
       & test_failed
    use mctc_io, only : structure_type
    use mstore, only : get_structure
+   use tblite_adjlist, only : adjacency_list, new_adjacency_list
    use tblite_basis_type
    use tblite_basis_slater, only : slater_to_gauss
    use tblite_cutoff, only : get_lattice_points
@@ -246,6 +247,7 @@ subroutine test_overlap_mol(error, mol, ref)
    real(wp), intent(in) :: ref(:, :)
 
    type(basis_type) :: bas
+   type(adjacency_list) :: list
    real(wp), allocatable :: lattr(:, :), overlap(:, :)
    real(wp) :: cutoff
    integer :: ii, jj
@@ -256,9 +258,10 @@ subroutine test_overlap_mol(error, mol, ref)
 
    cutoff = get_cutoff(bas)
    call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
+   call new_adjacency_list(list, mol, lattr, cutoff)
 
    allocate(overlap(bas%nao, bas%nao))
-   call get_overlap(mol, lattr, cutoff, bas, overlap)
+   call get_overlap(mol, lattr, list, bas, overlap)
 
    !where(abs(overlap) < thr) overlap = 0.0_wp
    !print '(*(6x,"&", 3(es20.14e1, "_wp":, ","), "&", /))', overlap
@@ -282,12 +285,16 @@ subroutine test_overlap_diat_mol(error, mol, ref)
    real(wp), intent(in) :: ref(:, :)
 
    type(basis_type) :: bas
+   type(adjacency_list) :: list
    real(wp), allocatable :: lattr(:, :), overlap(:, :), overlap_diat(:, :)
    real(wp) :: cutoff
    integer :: ii, jj
-   real(wp) :: scalfac(3,86)
+   real(wp), allocatable :: ksig(:,:), kpi(:,:), kdel(:,:) 
 
-   scalfac = 1.2_wp
+   allocate(ksig(mol%nid, mol%nid), kpi(mol%nid, mol%nid), kdel(mol%nid, mol%nid))
+   ksig = 1.2_wp
+   kpi = 1.2_wp
+   kdel = 1.2_wp
 
    call make_basis(bas, mol, 6)
    call check(error, bas%nao, size(ref, 1))
@@ -295,9 +302,10 @@ subroutine test_overlap_diat_mol(error, mol, ref)
 
    cutoff = get_cutoff(bas)
    call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
+   call new_adjacency_list(list, mol, lattr, cutoff)
 
    allocate(overlap(bas%nao, bas%nao), overlap_diat(bas%nao, bas%nao))
-   call get_overlap(mol, lattr, cutoff, bas, scalfac, overlap, overlap_diat)
+   call get_overlap(mol, lattr, list, bas, ksig, kpi, kdel, overlap, overlap_diat)
 
    do ii = 1, size(overlap_diat, 2)
       do jj = 1, size(overlap_diat, 1)
@@ -1770,7 +1778,7 @@ subroutine test_overlap_diat_grad_gen(vec, ksig, kpi, kdel, cgtoi, cgtoj, error)
    end do lp
    if (allocated(error)) return
 
-   ! Test the analytical againts the numerical gradient
+   ! Test the analytical against the numerical gradient
    do i = 1, 3
       vec(i) = vec(i) + step
       r2 = sum(vec**2)

@@ -99,11 +99,13 @@ contains
 
       integer :: i, prlevel
 
-      ! coordination number related arrays
+      ! Coordination number related arrays
       real(wp), allocatable :: cn(:), dcndr(:, :, :), dcndL(:, :, :), cn_en(:), dcn_endr(:, :, :), dcn_endL(:, :, :)
-      ! self energy related arrays
-      real(wp), allocatable :: selfenergy(:), dsedcn(:), dsedcn_en(:), lattr(:, :)
-
+      ! Self energy related arrays
+      real(wp), allocatable :: selfenergy(:), dsedr(:,:,:), dsedL(:,:,:) 
+      ! Periodicity
+      real(wp), allocatable :: lattr(:, :)
+      
       call timer%push("total CEH")
 
       if (present(verbosity)) then
@@ -149,9 +151,13 @@ contains
       end if
 
       ! calculate the scaled self energies
-      allocate(selfenergy(calc%bas%nsh), dsedcn(calc%bas%nsh), dsedcn_en(calc%bas%nsh))
-      call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, cn=cn, cn_en=cn_en, &
-      & selfenergy=selfenergy, dsedcn=dsedcn, dsedcn_en=dsedcn_en)
+      allocate(selfenergy(calc%bas%nsh)) 
+      if (grad) then
+         allocate(dsedr(3, mol%nat,calc%bas%nsh), dsedL(3, 3, calc%bas%nsh))
+      end if 
+      call get_scaled_selfenergy(calc%h0, mol%id, calc%bas%ish_at, calc%bas%nsh_id, &
+      & cn=cn, cn_en=cn_en, dcndr=dcndr, dcndL=dcndL, dcn_endr=dcn_endr, dcn_endL=dcn_endL, &
+      & selfenergy=selfenergy, dsedr=dsedr, dsedL=dsedL)
 
       cutoff = get_cutoff(calc%bas, accuracy)
       call get_lattice_points(mol%periodic, mol%lattice, cutoff, lattr)
@@ -170,7 +176,7 @@ contains
       call timer%pop
 
       ! Get initial potential for external fields and Coulomb
-      call new_potential(pot, mol, calc%bas, wfn%nspin)
+      call new_potential(pot, mol, calc%bas, wfn%nspin, grad)
       ! Set potential to zero
       call pot%reset
       ! Add potential due to external field
@@ -184,10 +190,14 @@ contains
       if (allocated(calc%coulomb)) then
          call timer%push("coulomb")
          ! Use electronegativity-weighted CN as 0th-order charge guess
-         call get_effective_qat(mol, cn_en, wfn%qat)
+         call get_effective_qat(mol, cn_en, wfn%qat, &
+         & dcn_endr, dcn_endL, wfn%dqatdr, wfn%dqatdL)
       
          call calc%coulomb%update(mol, ccache)
          call calc%coulomb%get_potential(mol, ccache, wfn, pot)
+         if(grad) then
+            call calc%coulomb%get_potential_gradient(mol, ccache, wfn, pot)
+         end if
          call timer%pop
       end if
 
