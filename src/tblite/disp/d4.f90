@@ -143,6 +143,7 @@ subroutine update(self, mol, cache)
    real(wp), allocatable :: lattr(:, :)
    type(dispersion_cache), pointer :: ptr
    integer :: mref
+   class(ncoord_type), allocatable :: ncoord
 
    call taint(cache, ptr)
    mref = maxval(self%model%ref)

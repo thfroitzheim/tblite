@@ -90,11 +90,13 @@ subroutine get_engrad(self, mol, cache, energies, gradient, sigma)
    real(wp), allocatable :: gwvec(:, :), gwdcn(:, :)
    real(wp), allocatable :: c6(:, :), dc6dcn(:, :)
    real(wp), allocatable :: dEdcn(:), lattr(:, :)
+   class(ncoord_type), allocatable :: ncoord
 
    mref = maxval(self%model%ref)
    grad = present(gradient).and.present(sigma)
 
    allocate(cn(mol%nat))
+   call new_ncoord(ncoord, mol, "exp", cutoff=self%cutoff%cn, rcov=self%model%rcov)
    call get_lattice_points(mol%periodic, mol%lattice, self%cutoff%cn, lattr)
    call self%ncoord%get_coordination_number(mol, lattr, cn)
 
