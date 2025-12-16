@@ -505,8 +505,20 @@ jobs:
       run: |
         set -eux
         source .venv/bin/activate
-        export PATH="${TBLITE_PREFIX}/bin:${TBLITE_PREFIX}/lib:${PATH}"
-        python -m pytest --pyargs tblite --cov=tblite -vv
+
+        python - <<'PY'
+        import os, subprocess
+        def w(p):
+            # MSYS path -> Windows path
+            return subprocess.check_output(["cygpath", "-w", p], text=True).strip()
+
+        if os.name == "nt":
+            os.add_dll_directory(w(os.environ["TBLITE_PREFIX"] + "/bin"))
+            os.add_dll_directory(w("/mingw64/bin"))
+
+        import pytest
+        raise SystemExit(pytest.main(["--pyargs", "tblite", "--cov=tblite", "-vv"]))
+        PY
 
     - name: Upload coverage report
       uses: codecov/codecov-action@v4
