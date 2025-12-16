@@ -507,13 +507,18 @@ jobs:
         source .venv/bin/activate
 
         python - <<'PY'
-        import os, subprocess
-        def w(p):
+        import os, subprocess, pathlib
+
+        def w(p: str) -> str:
             # MSYS path -> Windows path
             return subprocess.check_output(["cygpath", "-w", p], text=True).strip()
 
         if os.name == "nt":
-            os.add_dll_directory(w(os.environ["TBLITE_PREFIX"] + "/bin"))
+            # IMPORTANT: make prefix usable for the native DLL when it tries to open files
+            os.environ["TBLITE_PREFIX"] = w(os.environ["TBLITE_PREFIX"])
+            prefix = pathlib.Path(os.environ["TBLITE_PREFIX"])
+
+            os.add_dll_directory(str(prefix / "bin"))
             os.add_dll_directory(w("/mingw64/bin"))
 
         import pytest

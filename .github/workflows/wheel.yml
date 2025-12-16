@@ -79,7 +79,7 @@ jobs:
           - ubuntu-latest
           - macos-latest
           - macos-15-intel
-          # windows-latest
+          - windows-latest
         python: ['39', '310', '311', '312', '313', '314']
         include:
           - os: ubuntu-22.04
@@ -136,6 +136,9 @@ jobs:
             LDFLAGS="-L$(brew --prefix openblas)/lib"
             CPPFLAGS="-I$(brew --prefix openblas)/include"
             MACOSX_DEPLOYMENT_TARGET=15.0
+          # Windows: vendor DLL dependencies into the wheel
+          CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel}"
           CIBW_TEST_COMMAND: python -c "import tblite.interface"
 
       # Upload the built wheels as artifacts
