@@ -112,6 +112,7 @@ jobs:
         with:
           msystem: UCRT64
           update: true
+          path-type: inherit   # keep the normal Windows PATH too
           install: >-
             mingw-w64-ucrt-x86_64-toolchain
             mingw-w64-ucrt-x86_64-openblas
@@ -158,8 +159,7 @@ jobs:
          # Set windows variables
           CIBW_ENVIRONMENT_WINDOWS: >
             CC=gcc CXX=g++ FC=gfortran
-            PATH="C:\msys64\ucrt64\bin;C:\msys64\usr\bin;{PATH}"
-            PKG_CONFIG_PATH="C:\msys64\ucrt64\lib\pkgconfig"
+            PKG_CONFIG_PATH="C:/msys64/ucrt64/lib/pkgconfig"
           # Windows: vendor DLL dependencies into the wheel
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel show {wheel} && delvewheel repair -w {dest_dir} {wheel} --no-mangle-all"
