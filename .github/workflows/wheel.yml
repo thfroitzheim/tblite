@@ -105,12 +105,24 @@ jobs:
         with:
           name: tblite-python-sdist
 
+      # Setup OpenBLAS on Windows
+      - name: Setup MSYS2 + OpenBLAS (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit
+          install: >-
+            mingw-w64-ucrt-x86_64-openblas
+            mingw-w64-ucrt-x86_64-pkgconf
+
       # Build wheels for all supported Python versions
       - name: Build wheels
         run: python -m cibuildwheel --output-dir . *.tar.gz
         env:
-          CIBW_PLAT: ${{ contains(matrix.os, 'macos') && '-Dlapack=openblas' || '' }}
-          CIBW_CONFIG_SETTINGS: setup-args="-Dtblite:openmp=false"
+         # choose openblas on mac/windows, keep netlib on linux
+          CIBW_CONFIG_SETTINGS: setup-args="-Dtblite:openmp=false -Dtblite:lapack=${{ (contains(matrix.os, 'macos') || contains(matrix.os, 'windows')) && 'openblas' || 'netlib' }}"
           CIBW_ARCHS: auto64
           CIBW_ARCHS_MACOS: ${{ matrix.os == 'macos-latest' && 'arm64' || 'x86_64' }}
           CIBW_BUILD: "*${{ matrix.python }}-*"
@@ -136,6 +148,12 @@ jobs:
             LDFLAGS="-L$(brew --prefix openblas)/lib"
             CPPFLAGS="-I$(brew --prefix openblas)/include"
             MACOSX_DEPLOYMENT_TARGET=15.0
+         # Set windows variables
+          CIBW_ENVIRONMENT_WINDOWS: >
+            PKG_CONFIG=C:/msys64/ucrt64/bin/pkgconf.exe
+            PKG_CONFIG_PATH=C:/msys64/ucrt64/lib/pkgconfig
+            LDFLAGS=-LC:/msys64/ucrt64/lib
+            CPPFLAGS=-IC:/msys64/ucrt64/include
           # Windows: vendor DLL dependencies into the wheel
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel}"
