@@ -122,9 +122,14 @@ jobs:
         run: python -m cibuildwheel --output-dir . *.tar.gz
         env:
           # choose openblas on mac/windows, keep netlib on linux
-          CIBW_CONFIG_SETTINGS: |
+          CIBW_CONFIG_SETTINGS_LINUX: |
             setup-args="-Dtblite:openmp=false"
-            setup-args="-Dlapack=openblas"
+          CIBW_CONFIG_SETTINGS_MACOS: |
+            setup-args="-Dtblite:openmp=false"
+            setup-args="-Dtblite:lapack=openblas"
+          CIBW_CONFIG_SETTINGS_WINDOWS: |
+            setup-args="-Dtblite:openmp=false"
+            setup-args="-Dtblite:lapack=openblas"
           CIBW_ARCHS: auto64
           CIBW_ARCHS_MACOS: ${{ matrix.os == 'macos-latest' && 'arm64' || 'x86_64' }}
           CIBW_BUILD: "*${{ matrix.python }}-*"
