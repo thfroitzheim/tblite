@@ -70,7 +70,7 @@ jobs:
 
           - os: windows-latest
             build-type: debug
-            toolchain: {compiler: gcc, version: '15', build: meson}
+            toolchain: {compiler: gcc, version: '12', build: meson}
             msystem: MINGW64
             arch: x86_64
 
@@ -84,7 +84,7 @@ jobs:
 
           - os: windows-latest
             build-type: release
-            toolchain: {compiler: gcc, version: '15', build: meson}
+            toolchain: {compiler: gcc, version: '12', build: meson}
             msystem: MINGW64
             arch: x86_64
 
@@ -303,7 +303,7 @@ jobs:
         echo "TBLITE_PREFIX=$PWD/_dist" >> $GITHUB_ENV
 
     - name: Create package
-      if: ${{ matrix.toolchain.build == 'meson' && matrix.build-type == 'debug' && matrix.toolchain.compiler == 'gcc' && (matrix.toolchain.version == '12' || matrix.toolchain.version == '15') && !contains(matrix.os, 'windows') }}
+      if: ${{ matrix.toolchain.build == 'meson' && matrix.build-type == 'debug' && matrix.toolchain.compiler == 'gcc' && matrix.toolchain.version == '12' && !contains(matrix.os, 'windows') }}
       run: |
         tar cvf ${{ env.OUTPUT }} _dist
         xz -T0 ${{ env.OUTPUT }}
@@ -312,7 +312,7 @@ jobs:
         OUTPUT: tblite-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}-${{ matrix.os }}.tar
 
     - name: Create package (Windows/MSYS2)
-      if: ${{ matrix.toolchain.build == 'meson' && matrix.build-type == 'debug' && matrix.toolchain.compiler == 'gcc' && (matrix.toolchain.version == '12' || matrix.toolchain.version == '15') && contains(matrix.os, 'windows') }}
+      if: ${{ matrix.toolchain.build == 'meson' && matrix.build-type == 'debug' && matrix.toolchain.compiler == 'gcc' && matrix.toolchain.version == '12' && contains(matrix.os, 'windows') }}
       shell: msys2 {0}
       run: |
         tar cvf ${{ env.OUTPUT }} _dist
@@ -322,7 +322,7 @@ jobs:
         OUTPUT: tblite-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}-${{ matrix.os }}.tar
 
     - name: Upload package
-      if: ${{ matrix.toolchain.build == 'meson' && matrix.build-type == 'debug' && matrix.toolchain.compiler == 'gcc' && (matrix.toolchain.version == '12' || matrix.toolchain.version == '15') }}
+      if: ${{ matrix.toolchain.build == 'meson' && matrix.build-type == 'debug' && matrix.toolchain.compiler == 'gcc' && matrix.toolchain.version == '12' }}
       uses: actions/upload-artifact@v4
       with:
         name: ${{ env.TBLITE_OUTPUT }}
@@ -355,7 +355,7 @@ jobs:
             python_v: '3.12'
 
           - os: windows-latest
-            gcc_v: '15'
+            gcc_v: '12'
             python_v: '3.12'
             msystem: MINGW64
             arch: x86_64
@@ -398,6 +398,8 @@ jobs:
           mingw-w64-${{ matrix.arch }}-python-pkgconfig
           mingw-w64-${{ matrix.arch }}-python-matplotlib
           mingw-w64-${{ matrix.arch }}-python-certifi
+          mingw-w64-${{ matrix.arch }}-python-scipy
+          mingw-w64-${{ matrix.arch }}-python-pydantic
           mingw-w64-${{ matrix.arch }}-meson
           mingw-w64-${{ matrix.arch }}-ninja
           ca-certificates
@@ -442,9 +444,8 @@ jobs:
         export SSL_CERT_FILE
         echo "SSL_CERT_FILE=$SSL_CERT_FILE" >> "$GITHUB_ENV"
 
-        python -m pip install -U pip
-        # these aren't reliably available via pacman:
-        python -m pip install ase qcelemental meson-python
+        python -m pip install -U pip setuptools wheel
+        python -m pip install --no-deps ase qcelemental meson-python
 
     - name: Download package
       uses: actions/download-artifact@v4
