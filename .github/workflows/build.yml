@@ -377,22 +377,34 @@ jobs:
       with:
         python-version: ${{ matrix.python_v }}
 
-    - name: Setup MSYS2 toolchain (Windows)
+    - name: Setup MSYS2 (Windows)
       if: ${{ contains(matrix.os, 'windows') }}
       uses: msys2/setup-msys2@v2
       with:
         msystem: ${{ matrix.msystem }}
         update: false
+        path-type: minimal
         install: >-
           git
           mingw-w64-${{ matrix.arch }}-gcc-fortran
           mingw-w64-${{ matrix.arch }}-lapack
+          mingw-w64-${{ matrix.arch }}-pkg-config
           mingw-w64-${{ matrix.arch }}-python
           mingw-w64-${{ matrix.arch }}-python-pip
-          mingw-w64-${{ matrix.arch }}-pkg-config
+          mingw-w64-${{ matrix.arch }}-python-numpy
+          mingw-w64-${{ matrix.arch }}-python-cffi
+          mingw-w64-${{ matrix.arch }}-python-pytest
+          mingw-w64-${{ matrix.arch }}-python-pytest-cov
+          mingw-w64-${{ matrix.arch }}-python-pkgconfig
+          mingw-w64-${{ matrix.arch }}-python-matplotlib
+          mingw-w64-${{ matrix.arch }}-python-certifi
+          mingw-w64-${{ matrix.arch }}-meson
+          mingw-w64-${{ matrix.arch }}-ninja
+          ca-certificates
           xz
 
     - name: Install GCC Compiler (setup-fortran)
+      if: ${{ !contains(matrix.os, 'windows') }}
       uses: fortran-lang/setup-fortran@v1
       with:
         compiler: gcc
@@ -416,14 +428,23 @@ jobs:
       if: ${{ !contains(matrix.os, 'windows') }}
       run: |
         python -m pip install --upgrade pip
-        python -m pip install ${{ env.PIP_EXTRAS }}
+        python -m pip install ${{ env.PIP_EXTRAS }} meson-python
 
-    - name: Install test dependencies (Windows/MSYS2)
+    - name: Create venv + extra deps (Windows/MSYS2)
       if: ${{ contains(matrix.os, 'windows') }}
       shell: msys2 {0}
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install ${{ env.PIP_EXTRAS }}
+        set -eux
+        python -m venv --system-site-packages .venv
+        source .venv/bin/activate
+
+        SSL_CERT_FILE="$(python -c 'import certifi; print(certifi.where())')"
+        export SSL_CERT_FILE
+        echo "SSL_CERT_FILE=$SSL_CERT_FILE" >> "$GITHUB_ENV"
+
+        python -m pip install -U pip
+        # these aren't reliably available via pacman:
+        python -m pip install ase qcelemental meson-python
 
     - name: Download package
       uses: actions/download-artifact@v4
@@ -450,13 +471,14 @@ jobs:
       env:
         PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}:${{ env.TBLITE_PREFIX }}/lib/pkgconfig
 
-    - name: Install Python extension module (pip, Windows/MSYS2)
+    - name: Install Python extension module (Windows/MSYS2)
       if: ${{ contains(matrix.os, 'windows') }}
       shell: msys2 {0}
       working-directory: python
-      run: python -m pip install . --user
-      env:
-        PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}:${{ env.TBLITE_PREFIX }}/lib/pkgconfig
+      run: |
+        set -eux
+        source ../.venv/bin/activate
+        PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:${TBLITE_PREFIX}/lib/pkgconfig" python -m pip install . --no-build-isolation
 
     - name: Test Python API
       if: ${{ !contains(matrix.os, 'windows') }}
@@ -472,8 +494,10 @@ jobs:
       if: ${{ contains(matrix.os, 'windows') }}
       shell: msys2 {0}
       run: |
+        set -eux
+        source .venv/bin/activate
         export PATH="${TBLITE_PREFIX}/bin:${TBLITE_PREFIX}/lib:${PATH}"
-        pytest --pyargs tblite --cov=tblite -vv
+        python -m pytest --pyargs tblite --cov=tblite -vv
 
     - name: Upload coverage report
       uses: codecov/codecov-action@v4
