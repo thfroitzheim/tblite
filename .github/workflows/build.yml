@@ -445,6 +445,14 @@ jobs:
         echo "SSL_CERT_FILE=$SSL_CERT_FILE" >> "$GITHUB_ENV"
 
         python -m pip install -U pip setuptools wheel
+
+        # Needed so the pyproject build backend "mesonpy" can be imported
+        python -m pip install pyproject-metadata
+
+        # qcelemental runtime dep (pure python, quick)
+        python -m pip install pint
+
+        # Keep deps disabled for the big packages to avoid builds
         python -m pip install --no-deps ase qcelemental meson-python
 
     - name: Download package
