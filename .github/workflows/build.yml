@@ -70,7 +70,21 @@ jobs:
 
           - os: windows-latest
             build-type: debug
-            toolchain: {compiler: gcc, version: 'latest', build: meson}
+            toolchain: {compiler: gcc, version: '15', build: meson}
+            msystem: MINGW64
+            arch: x86_64
+
+          - os: ubuntu-latest
+            build-type: release
+            toolchain: {compiler: gcc, version: '12', build: meson}
+
+          - os: macos-latest
+            build-type: release
+            toolchain: {compiler: gcc, version: '12', build: meson}
+
+          - os: windows-latest
+            build-type: release
+            toolchain: {compiler: gcc, version: '15', build: meson}
             msystem: MINGW64
             arch: x86_64
 
@@ -106,19 +120,13 @@ jobs:
           mingw-w64-${{ matrix.arch }}-ninja
           mingw-w64-${{ matrix.arch }}-binutils
           mingw-w64-${{ matrix.arch }}-pkg-config
+          xz
 
-    - name: Install GCC Compiler
-      if: ${{ matrix.toolchain.compiler == 'gcc' }}
+    - name: Install compiler (setup-fortran)
+      if: ${{ matrix.toolchain.compiler == 'gcc' || (contains(matrix.os, 'ubuntu') && contains(matrix.toolchain.compiler, 'intel')) }}
       uses: fortran-lang/setup-fortran@v1
       with:
-        compiler: gcc
-        version: ${{ matrix.toolchain.version }}
-
-    - name: Install Intel Compiler (Linux)
-      if: ${{ contains(matrix.os, 'ubuntu') && contains(matrix.toolchain.compiler, 'intel') }}
-      uses: fortran-lang/setup-fortran@v1
-      with:
-        compiler: ${{ matrix.toolchain.compiler }}
+        compiler: ${{ matrix.toolchain.compiler == 'gcc' && 'gcc' || matrix.toolchain.compiler }}
         version: ${{ matrix.toolchain.version }}
 
     - name: Install LAPACK (macOS)
@@ -168,30 +176,29 @@ jobs:
 
     - name: Install build and test dependencies
       if: ${{ !contains(matrix.os, 'windows') }}
-      run: pip3 install ${{ env.PIP_PACKAGES }} ${{ env.PIP_EXTRAS }}
+      run: python -m pip install ${{ env.PIP_PACKAGES }} ${{ env.PIP_EXTRAS }}
 
-    - name: Configure build (meson) [non-Windows]
+    - name: Configure build (meson)
       if: ${{ matrix.toolchain.build == 'meson' && !contains(matrix.os, 'windows') }}
       run: >-
         meson setup ${{ env.BUILD_DIR }}
-        --buildtype=debug
+        --buildtype=${{ matrix.build-type == 'coverage' && 'debug' || matrix.build-type }}
         --prefix=$PWD/_dist
         --libdir=lib
         --warnlevel=0
-        -Db_coverage=${{ env.COVERAGE }}
+        -Db_coverage=${{ matrix.build-type == 'coverage' }}
         ${{ env.MESON_ARGS }}
       env:
-        COVERAGE: ${{ matrix.build-type == 'coverage' }}
         MESON_ARGS: >-
           ${{ contains(matrix.toolchain.compiler, 'intel') && '-Dfortran_link_args=-qopenmp -Dapi=false' || '' }}
           ${{ contains(matrix.os, 'macos') && '-Dlapack=openblas' || '' }}
 
-    - name: Configure build (meson) [Windows/MSYS2]
+    - name: Configure build (meson, Windows/MSYS2)
       if: ${{ matrix.toolchain.build == 'meson' && contains(matrix.os, 'windows') }}
       shell: msys2 {0}
       run: >-
         meson setup ${{ env.BUILD_DIR }}
-        --buildtype=debug
+        --buildtype=${{ matrix.build-type }}
         --prefix="$PWD/_dist"
         --libdir=lib
         --warnlevel=0
@@ -217,63 +224,62 @@ jobs:
         fpm --version
         fpm build
 
-    - name: Build library [non-Windows]
+    - name: Build library
       if: ${{ matrix.toolchain.build != 'fpm' && !contains(matrix.os, 'windows') }}
       run: ninja -C ${{ env.BUILD_DIR }}
 
-    - name: Build library [Windows/MSYS2]
+    - name: Build library (Windows/MSYS2)
       if: ${{ matrix.toolchain.build != 'fpm' && contains(matrix.os, 'windows') }}
       shell: msys2 {0}
-      run: |
-        meson compile -C ${{ env.BUILD_DIR }}
+      run: ninja -C ${{ env.BUILD_DIR }}
 
     - name: Run unit tests (fpm)
       if: ${{ matrix.toolchain.build == 'fpm' }}
       run: fpm test
 
-    - name: Run unit tests (meson) [non-Windows]
+    - name: Run unit tests (meson)
       if: ${{ matrix.toolchain.build == 'meson' && !contains(matrix.os, 'windows') }}
       run: >-
-         meson test
-         -C ${{ env.BUILD_DIR }}
-         --print-errorlogs
-         --no-rebuild
-         --num-processes 1
-         --suite tblite
-         -t 2
+        meson test
+        -C ${{ env.BUILD_DIR }}
+        --print-errorlogs
+        --no-rebuild
+        --num-processes 1
+        --suite tblite
+        -t 2
       env:
         OMP_NUM_THREADS: 1,2,1
 
-    - name: Run unit tests (meson) [Windows/MSYS2]
+    - name: Run unit tests (meson, Windows/MSYS2)
       if: ${{ matrix.toolchain.build == 'meson' && contains(matrix.os, 'windows') }}
       shell: msys2 {0}
       run: >-
-         meson test
-         -C ${{ env.BUILD_DIR }}
-         --print-errorlogs
-         --no-rebuild
-         --num-processes 1
-         --suite tblite
-         -t 120
+        meson test
+        -C ${{ env.BUILD_DIR }}
+        --print-errorlogs
+        --no-rebuild
+        --num-processes 1
+        --suite tblite
+        -t 120
       env:
         OMP_NUM_THREADS: 1
 
     - name: Run benchmarks
-      if: ${{ matrix.toolchain.build == 'meson' && !contains(matrix.os, 'windows') }}
+      if: ${{ matrix.toolchain.build == 'meson' && matrix.build-type == 'debug' && !contains(matrix.os, 'windows') }}
       run: >-
-         meson test
-         -C ${{ env.BUILD_DIR }}
-         --print-errorlogs
-         --no-rebuild
-         --num-processes 1
-         --suite tblite
-         -t 2
-         --benchmark
+        meson test
+        -C ${{ env.BUILD_DIR }}
+        --print-errorlogs
+        --no-rebuild
+        --num-processes 1
+        --suite tblite
+        -t 2
+        --benchmark
 
     - name: Run unit tests (ctest)
       if: ${{ matrix.toolchain.build == 'cmake' }}
       run: |
-         ctest --output-on-failure --parallel 2 -R '^tblite/'
+        ctest --output-on-failure --parallel 2 -R '^tblite/'
       working-directory: ${{ env.BUILD_DIR }}
       env:
         OMP_NUM_THREADS: 1,2,1
@@ -281,23 +287,33 @@ jobs:
     - name: Create coverage report
       if: ${{ matrix.toolchain.build == 'meson' && matrix.build-type == 'coverage' }}
       run: |
-         ninja -C ${{ env.BUILD_DIR }} coverage
+        ninja -C ${{ env.BUILD_DIR }} coverage
 
-    - name: Install project [non-Windows]
+    - name: Install project
       if: ${{ matrix.toolchain.build != 'fpm' && !contains(matrix.os, 'windows') }}
       run: |
         ninja -C ${{ env.BUILD_DIR }} install
         echo "TBLITE_PREFIX=$PWD/_dist" >> $GITHUB_ENV
 
-    - name: Install project [Windows/MSYS2]
+    - name: Install project (Windows/MSYS2)
       if: ${{ matrix.toolchain.build != 'fpm' && contains(matrix.os, 'windows') }}
       shell: msys2 {0}
       run: |
-        meson install -C ${{ env.BUILD_DIR }} --no-rebuild
+        ninja -C ${{ env.BUILD_DIR }} install
         echo "TBLITE_PREFIX=$PWD/_dist" >> $GITHUB_ENV
 
     - name: Create package
-      if: ${{ matrix.toolchain.build == 'meson' && matrix.toolchain.version == '12' && matrix.build-type == 'debug' && matrix.toolchain.compiler == 'gcc' }}
+      if: ${{ matrix.toolchain.build == 'meson' && matrix.build-type == 'debug' && matrix.toolchain.compiler == 'gcc' && (matrix.toolchain.version == '12' || matrix.toolchain.version == '15') && !contains(matrix.os, 'windows') }}
+      run: |
+        tar cvf ${{ env.OUTPUT }} _dist
+        xz -T0 ${{ env.OUTPUT }}
+        echo "TBLITE_OUTPUT=${{ env.OUTPUT }}.xz" >> $GITHUB_ENV
+      env:
+        OUTPUT: tblite-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}-${{ matrix.os }}.tar
+
+    - name: Create package (Windows/MSYS2)
+      if: ${{ matrix.toolchain.build == 'meson' && matrix.build-type == 'debug' && matrix.toolchain.compiler == 'gcc' && (matrix.toolchain.version == '12' || matrix.toolchain.version == '15') && contains(matrix.os, 'windows') }}
+      shell: msys2 {0}
       run: |
         tar cvf ${{ env.OUTPUT }} _dist
         xz -T0 ${{ env.OUTPUT }}
@@ -306,7 +322,7 @@ jobs:
         OUTPUT: tblite-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}-${{ matrix.os }}.tar
 
     - name: Upload package
-      if: ${{ matrix.toolchain.build == 'meson' && matrix.toolchain.version == '12' && matrix.build-type == 'debug' && matrix.toolchain.compiler == 'gcc' }}
+      if: ${{ matrix.toolchain.build == 'meson' && matrix.build-type == 'debug' && matrix.toolchain.compiler == 'gcc' && (matrix.toolchain.version == '12' || matrix.toolchain.version == '15') }}
       uses: actions/upload-artifact@v4
       with:
         name: ${{ env.TBLITE_OUTPUT }}
@@ -330,32 +346,60 @@ jobs:
         python_v: ['3.9', '3.10', '3.11', '3.12', '3.13']
 
         include:
-        - os: macos-latest
-          gcc_v: '12'
-          python_v: '3.12'
+          - os: macos-latest
+            gcc_v: '12'
+            python_v: '3.12'
 
-        - os: macos-15-intel
-          gcc_v: '12'
-          python_v: '3.12'
+          - os: macos-15-intel
+            gcc_v: '12'
+            python_v: '3.12'
+
+          - os: windows-latest
+            gcc_v: '15'
+            python_v: '3.12'
+            msystem: MINGW64
+            arch: x86_64
 
     env:
-      FC: gfortran
-      CC: gcc
-      GCC_V: ${{ matrix.gcc_v }}
-      PYTHON_V: ${{ matrix.python_v }}
       OMP_NUM_THREADS: 2,1
       TBLITE_OUTPUT: tblite-gcc-${{ matrix.gcc_v }}-${{ matrix.os }}.tar.xz
+
+    defaults:
+      run:
+        shell: bash
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
     - uses: actions/setup-python@v5
+      if: ${{ !contains(matrix.os, 'windows') }}
       with:
         python-version: ${{ matrix.python_v }}
 
+    - name: Setup MSYS2 toolchain (Windows)
+      if: ${{ contains(matrix.os, 'windows') }}
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: ${{ matrix.msystem }}
+        update: false
+        install: >-
+          git
+          mingw-w64-${{ matrix.arch }}-gcc-fortran
+          mingw-w64-${{ matrix.arch }}-lapack
+          mingw-w64-${{ matrix.arch }}-python
+          mingw-w64-${{ matrix.arch }}-python-pip
+          mingw-w64-${{ matrix.arch }}-pkg-config
+          xz
+
+    - name: Install GCC Compiler (setup-fortran)
+      uses: fortran-lang/setup-fortran@v1
+      with:
+        compiler: gcc
+        version: ${{ matrix.gcc_v }}
+
     - name: Link LAPACK (macOS)
-      if: ${{ contains(matrix.os, 'macos')}}
+      if: ${{ contains(matrix.os, 'macos') }}
       run: |
         brew install openblas
         echo "PKG_CONFIG_PATH=$(brew --prefix openblas)/lib/pkgconfig" >> $GITHUB_ENV
@@ -368,14 +412,18 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libblas-dev liblapack-dev
 
-    - name: Install GCC Compiler
-      uses: fortran-lang/setup-fortran@v1
-      with:
-        compiler: gcc
-        version: ${{ matrix.gcc_v }}
+    - name: Install test dependencies
+      if: ${{ !contains(matrix.os, 'windows') }}
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install ${{ env.PIP_EXTRAS }}
 
-    - name: Install meson and test dependencies
-      run: pip3 install ${{ env.PIP_EXTRAS }}
+    - name: Install test dependencies (Windows/MSYS2)
+      if: ${{ contains(matrix.os, 'windows') }}
+      shell: msys2 {0}
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install ${{ env.PIP_EXTRAS }}
 
     - name: Download package
       uses: actions/download-artifact@v4
@@ -383,21 +431,49 @@ jobs:
         name: ${{ env.TBLITE_OUTPUT }}
 
     - name: Unpack package
+      if: ${{ !contains(matrix.os, 'windows') }}
+      run: |
+        tar xvf ${{ env.TBLITE_OUTPUT }}
+        echo "TBLITE_PREFIX=$PWD/_dist" >> $GITHUB_ENV
+
+    - name: Unpack package (Windows/MSYS2)
+      if: ${{ contains(matrix.os, 'windows') }}
+      shell: msys2 {0}
       run: |
         tar xvf ${{ env.TBLITE_OUTPUT }}
         echo "TBLITE_PREFIX=$PWD/_dist" >> $GITHUB_ENV
 
     - name: Install Python extension module (pip)
-      run: pip3 install . --user
+      if: ${{ !contains(matrix.os, 'windows') }}
       working-directory: python
+      run: python -m pip install . --user
+      env:
+        PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}:${{ env.TBLITE_PREFIX }}/lib/pkgconfig
+
+    - name: Install Python extension module (pip, Windows/MSYS2)
+      if: ${{ contains(matrix.os, 'windows') }}
+      shell: msys2 {0}
+      working-directory: python
+      run: python -m pip install . --user
       env:
         PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}:${{ env.TBLITE_PREFIX }}/lib/pkgconfig
 
     - name: Test Python API
-      run: pytest --pyargs tblite --cov=tblite -vv
-      env:
-        LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}:${{ env.TBLITE_PREFIX }}/lib
-        DYLD_LIBRARY_PATH: ${{ env.DYLD_LIBRARY_PATH }}:${{ env.TBLITE_PREFIX }}/lib
+      if: ${{ !contains(matrix.os, 'windows') }}
+      run: |
+        if [[ "${RUNNER_OS}" == "macOS" ]]; then
+          export DYLD_LIBRARY_PATH="${TBLITE_PREFIX}/lib:${DYLD_LIBRARY_PATH}"
+        else
+          export LD_LIBRARY_PATH="${TBLITE_PREFIX}/lib:${LD_LIBRARY_PATH}"
+        fi
+        pytest --pyargs tblite --cov=tblite -vv
+
+    - name: Test Python API (Windows/MSYS2)
+      if: ${{ contains(matrix.os, 'windows') }}
+      shell: msys2 {0}
+      run: |
+        export PATH="${TBLITE_PREFIX}/bin:${TBLITE_PREFIX}/lib:${PATH}"
+        pytest --pyargs tblite --cov=tblite -vv
 
     - name: Upload coverage report
       uses: codecov/codecov-action@v4
