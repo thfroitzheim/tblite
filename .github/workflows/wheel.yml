@@ -68,76 +68,6 @@ jobs:
         path: ./*.tar.gz
         retention-days: 5
 
-name: wheel
-
-on:
-  push:
-  pull_request:
-  workflow_dispatch:
-  release:
-    types: [published]
-
-env:
-  # https://github.com/actions/checkout/issues/1809
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-
-jobs:
-  source:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash -l {0}
-    steps:
-    - uses: actions/checkout@v4
-    - name: Setup Python
-      uses: mamba-org/setup-micromamba@v1
-      with:
-        environment-file: assets/ci/build-env.yaml
-    - name: Install LAPACK
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y liblapack-dev
-    - run: |
-        meson setup _build
-        meson dist -C _build --no-tests --include-subprojects
-        mv _build/meson-dist/*.tar.xz .
-    - uses: actions/upload-artifact@v4
-      with:
-        name: tblite-source
-        path: ./*.tar.xz
-        retention-days: 5
-
-  sdist:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash -l {0}
-    steps:
-    - uses: actions/checkout@v4
-    - name: Setup Python
-      uses: mamba-org/setup-micromamba@v1
-      with:
-        environment-file: assets/ci/python-env.yaml
-        create-args: >-
-          meson-python
-          python-build
-    - name: Install LAPACK
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y liblapack-dev
-    - name: Reorganize repository
-      run: |
-        git config user.email ""
-        git config user.name "dummy"
-        git subtree add --prefix python/subprojects/tblite . HEAD
-    - run: |
-        python -m build python/ --sdist --outdir . -n
-    - uses: actions/upload-artifact@v4
-      with:
-        name: tblite-python-sdist
-        path: ./*.tar.gz
-        retention-days: 5
-
   wheels:
     needs:
       - sdist
@@ -191,29 +121,7 @@ jobs:
 
       # Build wheels for all supported Python versions
       - name: Build wheels
-        run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            # Sanitize path: convert backslashes to forward slashes to avoid escaping issues
-            MSYS_PATH=$(echo "${{ steps.msys2.outputs.msys2-location }}" | sed 's/\\/\//g')
-
-            # Add MSYS2 to PATH for this session so cibuildwheel inherits it automatically
-            export PATH="$MSYS_PATH/ucrt64/bin:$MSYS_PATH/usr/bin:$PATH"
-
-            # Set environment variables for the build (compilers, flags)
-            # We construct this here to avoid YAML string parsing issues
-            export CIBW_ENVIRONMENT_WINDOWS="CC=$MSYS_PATH/ucrt64/bin/gcc.exe \
-            CXX=$MSYS_PATH/ucrt64/bin/g++.exe \
-            FC=$MSYS_PATH/ucrt64/bin/gfortran.exe \
-            PKG_CONFIG=$MSYS_PATH/ucrt64/bin/pkg-config.exe \
-            PKG_CONFIG_PATH=$MSYS_PATH/ucrt64/lib/pkgconfig \
-            LDFLAGS=-L$MSYS_PATH/ucrt64/lib \
-            CPPFLAGS=-I$MSYS_PATH/ucrt64/include"
-
-            # Set repair command with the sanitized path
-            export CIBW_REPAIR_WHEEL_COMMAND_WINDOWS="delvewheel show {wheel} && delvewheel repair -w {dest_dir} {wheel} --add-path $MSYS_PATH/ucrt64/bin --no-mangle-all"
-          fi
-          
-          python -m cibuildwheel --output-dir . *.tar.gz
+        run: python -m cibuildwheel --output-dir . *.tar.gz
         env:
           # choose openblas on mac/windows, keep netlib on linux
           CIBW_CONFIG_SETTINGS_LINUX: |
@@ -249,8 +157,22 @@ jobs:
             LDFLAGS="-L$(brew --prefix openblas)/lib"
             CPPFLAGS="-I$(brew --prefix openblas)/include"
             MACOSX_DEPLOYMENT_TARGET=15.0
-          # Standard Windows setup
+          # Set windows variables
+          CIBW_ENVIRONMENT_WINDOWS: >
+            PATH='${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin;${{ steps.msys2.outputs.msys2-location }}/usr/bin;$PATH'
+            CC='${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin/gcc.exe'
+            CXX='${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin/g++.exe'
+            FC='${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin/gfortran.exe'
+            PKG_CONFIG='${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin/pkg-config.exe'
+            PKG_CONFIG_PATH='${{ steps.msys2.outputs.msys2-location }}/ucrt64/lib/pkgconfig'
+            LDFLAGS='-L${{ steps.msys2.outputs.msys2-location }}/ucrt64/lib'
+            CPPFLAGS='-I${{ steps.msys2.outputs.msys2-location }}/ucrt64/include'
           CIBW_BEFORE_BUILD_WINDOWS: pip install delvewheel
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: >
+            delvewheel show {wheel} &&
+            delvewheel repair -w {dest_dir} {wheel}
+            --add-path '${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin'
+            --no-mangle-all
           CIBW_TEST_COMMAND: python -c "import tblite.interface"
    
       # Upload the built wheels as artifacts
