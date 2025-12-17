@@ -159,19 +159,19 @@ jobs:
             MACOSX_DEPLOYMENT_TARGET=15.0
           # Set windows variables
           CIBW_ENVIRONMENT_WINDOWS: >
-            PATH="${{ steps.msys2.outputs.msys2-location }}\\ucrt64\\bin;${{ steps.msys2.outputs.msys2-location }}\\usr\\bin;$PATH"
-            CC="${{ steps.msys2.outputs.msys2-location }}\\ucrt64\\bin\\gcc.exe"
-            CXX="${{ steps.msys2.outputs.msys2-location }}\\ucrt64\\bin\\g++.exe"
-            FC="${{ steps.msys2.outputs.msys2-location }}\\ucrt64\\bin\\gfortran.exe"
-            PKG_CONFIG="${{ steps.msys2.outputs.msys2-location }}\\ucrt64\\bin\\pkg-config.exe"
-            PKG_CONFIG_PATH="${{ steps.msys2.outputs.msys2-location }}\\ucrt64\\lib\\pkgconfig"
-            LDFLAGS="-L${{ steps.msys2.outputs.msys2-location }}\\ucrt64\\lib"
-            CPPFLAGS="-I${{ steps.msys2.outputs.msys2-location }}\\ucrt64\\include"
+            PATH='${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin;${{ steps.msys2.outputs.msys2-location }}/usr/bin;$PATH'
+            CC='${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin/gcc.exe'
+            CXX='${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin/g++.exe'
+            FC='${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin/gfortran.exe'
+            PKG_CONFIG='${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin/pkg-config.exe'
+            PKG_CONFIG_PATH='${{ steps.msys2.outputs.msys2-location }}/ucrt64/lib/pkgconfig'
+            LDFLAGS='-L${{ steps.msys2.outputs.msys2-location }}/ucrt64/lib'
+            CPPFLAGS='-I${{ steps.msys2.outputs.msys2-location }}/ucrt64/include'
           CIBW_BEFORE_BUILD_WINDOWS: pip install delvewheel
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: >
             delvewheel show {wheel} &&
             delvewheel repair -w {dest_dir} {wheel}
-            --add-path "${{ steps.msys2.outputs.msys2-location }}\\ucrt64\\bin"
+            --add-path '${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin'
             --no-mangle-all
           CIBW_TEST_COMMAND: python -c "import tblite.interface"
    
