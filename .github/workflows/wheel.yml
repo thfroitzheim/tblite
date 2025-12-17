@@ -158,19 +158,20 @@ jobs:
             MACOSX_DEPLOYMENT_TARGET=15.0
           # Set windows variables
           CIBW_ENVIRONMENT_WINDOWS: >
-            PATH="C:\\msys64\\ucrt64\\bin;C:\\msys64\\usr\\bin;$PATH"
-            CC="C:\\msys64\\ucrt64\\bin\\gcc.exe"
-            CXX="C:\\msys64\\ucrt64\\bin\\g++.exe"
-            FC="C:\\msys64\\ucrt64\\bin\\gfortran.exe"
-            PKG_CONFIG="C:\\msys64\\ucrt64\\bin\\pkg-config.exe"
-            PKG_CONFIG_PATH="C:\\msys64\\ucrt64\\lib\\pkgconfig"
-            LDFLAGS="-LC:\\msys64\\ucrt64\\lib"
-            CPPFLAGS="-IC:\\msys64\\ucrt64\\include"
-          # Windows: vendor DLL dependencies into the wheel
-          CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
+            PATH="${{ steps.msys2.outputs.msys2-location }}\ucrt64\bin;${{ steps.msys2.outputs.msys2-location }}\usr\bin;%PATH%"
+            CC="${{ steps.msys2.outputs.msys2-location }}\ucrt64\bin\gcc.exe"
+            CXX="${{ steps.msys2.outputs.msys2-location }}\ucrt64\bin\g++.exe"
+            FC="${{ steps.msys2.outputs.msys2-location }}\ucrt64\bin\gfortran.exe"
+            PKG_CONFIG="${{ steps.msys2.outputs.msys2-location }}\ucrt64\bin\pkg-config.exe"
+            PKG_CONFIG_PATH="${{ steps.msys2.outputs.msys2-location }}\ucrt64\lib\pkgconfig"
+            LDFLAGS="-L${{ steps.msys2.outputs.msys2-location }}\ucrt64\lib"
+            CPPFLAGS="-I${{ steps.msys2.outputs.msys2-location }}\ucrt64\include"
+          CIBW_BEFORE_BUILD_WINDOWS: pip install delvewheel
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: >
             delvewheel show {wheel} &&
-            delvewheel repair -w {dest_dir} {wheel} --add-path C:\\msys64\\ucrt64\\bin --no-mangle-all
+            delvewheel repair -w {dest_dir} {wheel}
+            --add-path "${{ steps.msys2.outputs.msys2-location }}\ucrt64\bin"
+            --no-mangle-all
           CIBW_TEST_COMMAND: python -c "import tblite.interface"
    
       # Upload the built wheels as artifacts
