@@ -548,7 +548,8 @@ def get_virial(res) -> np.ndarray:
     error_check(lib.tblite_get_result_virial)(
         res, ffi.cast("double*", _virial.ctypes.data)
     )
-    return _virial
+    # virial is stored in column-major order
+    return _virial.T
 
 
 def get_charges(res) -> np.ndarray:
