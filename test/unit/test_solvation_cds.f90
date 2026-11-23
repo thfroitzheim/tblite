@@ -23,6 +23,7 @@ module test_solvation_cds
    use mstore, only : get_structure
    use tblite_container, only : container_cache
    use tblite_scf_potential, only : potential_type
+   use tblite_solvation, only : new_solvation_cds, solvation_input, solvation_type
    use tblite_solvation_cds, only : cds_solvation, cds_input
    use tblite_solvation_data, only : solvent_data, get_solvent_data, &
       & get_vdw_rad_cosmo, get_vdw_rad_bondi, get_vdw_rad_d3
@@ -76,7 +77,8 @@ subroutine collect_solvation_cds(testsuite)
       new_unittest("sigma-scf-gfn1", test_s_cds_gfn1), &
       new_unittest("sigma-nonscf", test_s_cds_nonscf), &
       new_unittest("potential", test_p_cds), &
-      new_unittest("unsupported-solvent", test_unsupported_solvent, should_fail=.true.) &
+      new_unittest("unsupported-solvent", test_unsupported_solvent, should_fail=.true.), &
+      new_unittest("unsupported-periodic", test_unsupported_periodic, should_fail=.true.) &
       ]
 
 end subroutine collect_solvation_cds
@@ -1154,6 +1156,24 @@ subroutine test_unsupported_solvent(error)
    call get_cds_param(input, mol, "gfn1", error)
 
 end subroutine test_unsupported_solvent
+
+
+subroutine test_unsupported_periodic(error)
+
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
+
+   type(structure_type) :: mol
+   type(solvation_input) :: input
+   class(solvation_type), allocatable :: solv
+
+   call get_structure(mol, "X23", "urea")
+
+   ! Check CDS model is rejected for periodic systems
+   input%cds = cds_input(solvent="water", alpb=.true.)
+   call new_solvation_cds(solv, mol, input, error, "gfn2")
+
+end subroutine test_unsupported_periodic
 
 
 end module test_solvation_cds

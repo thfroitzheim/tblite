@@ -23,6 +23,7 @@ module test_solvation_born
    use mstore, only : get_structure
    use tblite_container, only : container_cache
    use tblite_scf_potential, only : potential_type
+   use tblite_solvation, only : new_solvation, solvation_input, solvation_type
    use tblite_solvation_alpb, only : alpb_input, alpb_solvation, born_kernel
    use tblite_solvation_born, only : born_integrator, new_born_integrator
    use tblite_solvation_data, only : solvent_data, get_solvent_data, &
@@ -83,7 +84,8 @@ subroutine collect_solvation_born(testsuite)
       new_unittest("potential-alpb", test_p_alpb), &
       new_unittest("potential-still", test_p_still), &
       new_unittest("potential-gbsa", test_p_gbsa), &
-      new_unittest("unsupported-solvent", test_unsupported_solvent, should_fail=.true.) &
+      new_unittest("unsupported-solvent", test_unsupported_solvent, should_fail=.true.), &
+      new_unittest("unsupported-periodic", test_unsupported_periodic, should_fail=.true.) &
       ]
 
 end subroutine collect_solvation_born
@@ -1529,6 +1531,24 @@ subroutine test_unsupported_solvent(error)
    call get_alpb_param(input, mol, "gfn1", error)
 
 end subroutine test_unsupported_solvent
+
+
+subroutine test_unsupported_periodic(error)
+
+   !> Error handling
+   type(error_type), allocatable, intent(out) :: error
+
+   type(structure_type) :: mol
+   type(solvation_input) :: input
+   class(solvation_type), allocatable :: solv
+
+   call get_structure(mol, "X23", "urea")
+
+   ! Check solvation model is rejected for periodic systems
+   input%alpb = alpb_input(80.0_wp)
+   call new_solvation(solv, mol, input, error)
+
+end subroutine test_unsupported_periodic
 
 
 end module test_solvation_born
